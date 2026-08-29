@@ -27,7 +27,7 @@ export type BookPage = {
   translated: string;
   fact: string;
   scene: string;
-  image?: string;
+  image?: string | undefined;
 };
 
 export type Book = {
@@ -41,7 +41,7 @@ export type Book = {
   age: string;
   secondLanguage: string;
   coverScene: string;
-  coverImage?: string;
+  coverImage?: string | undefined;
   blurb: string;
   pages: BookPage[];
 };

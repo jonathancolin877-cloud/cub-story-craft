@@ -68,12 +68,9 @@ export async function fetchLastBook(): Promise<{ id: string; book: Book } | null
     age: meta["age"] ?? "",
     secondLanguage: meta["secondLanguage"] ?? "",
     coverScene: meta["coverScene"] ?? "",
-    ...(images.cover ? { coverImage: images.cover } : {}),
+    coverImage: images.cover ?? undefined,
     blurb: meta["blurb"] ?? "",
-    pages: rawPages.map((p, i) => {
-      const img = images.pages?.[i];
-      return img ? { ...p, image: img } : { ...p, image: undefined as never as string };
-    }),
+    pages: rawPages.map((p, i) => ({ ...p, image: images.pages?.[i] ?? undefined })),
   };
   return { id: data.id as string, book };
 }
