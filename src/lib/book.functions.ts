@@ -47,7 +47,10 @@ Story arc (strict):
 
 Rules:
 - Each page: ONE sentence in English, max 12 words, simple words for age ${data.age}.
-- "translated" is the same sentence in ${data.secondLanguage}, native script, natural for kids.
+- "translated" MUST be an accurate, natural translation of that exact English sentence into ${data.secondLanguage}, written ONLY in the proper native script (Hindi = Devanagari देवनागरी, Arabic = Arabic script, Spanish = Latin with accents).
+- NEVER transliterate into English letters, never output romanized text, never mix scripts, never output placeholder or nonsense characters.
+- The ${data.secondLanguage} sentence must use simple, everyday words a ${data.age} child understands, short (max ~12 words), and must be grammatically correct with correct matras/diacritics.
+- Double-check every translated line reads naturally when spoken aloud to a small child.
 - "fact" is a REAL zoology fact about the ${data.animal} (one short sentence, true, kid-friendly). No repeats.
 - "scene" is a visual description of the illustration for that page (no text in the image), 1-2 sentences.
 - "characterSheet" is a fixed visual description of the character (colors, markings, clothing/accessory, expression) reused for every illustration for consistency.
