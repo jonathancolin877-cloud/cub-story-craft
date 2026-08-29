@@ -13,6 +13,59 @@ function download(name: string, content: string, type = "text/plain;charset=utf-
 
 const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 
+
+const SCRIPT_FONT = '600 %dpx "Noto Sans Devanagari","Noto Sans Arabic",Nunito,sans-serif';
+
+/** Browsers shape complex scripts (Devanagari matras, Arabic joining) correctly,
+ *  PDF core fonts do not - so render the line on a canvas and embed it as an image. */
+async function scriptLineImage(
+  text: string,
+  opts: { fontPx: number; maxWidthPx: number; color: string },
+) {
+  try {
+    await document.fonts.load(SCRIPT_FONT.replace("%d", String(opts.fontPx)), text);
+    await document.fonts.ready;
+  } catch {
+    /* fonts may already be resolved */
+  }
+  const scale = 3;
+  const measure = document.createElement("canvas").getContext("2d");
+  if (!measure) return null;
+  const font = SCRIPT_FONT.replace("%d", String(opts.fontPx * scale));
+  measure.font = font;
+  const maxW = opts.maxWidthPx * scale;
+
+  const words = text.split(/\s+/).filter(Boolean);
+  const lines: string[] = [];
+  let line = "";
+  for (const w of words) {
+    const candidate = line ? `${line} ${w}` : w;
+    if (measure.measureText(candidate).width > maxW && line) {
+      lines.push(line);
+      line = w;
+    } else line = candidate;
+  }
+  if (line) lines.push(line);
+  if (!lines.length) return null;
+
+  const lineH = opts.fontPx * scale * 1.45;
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.ceil(Math.min(maxW, Math.max(...lines.map((l) => measure.measureText(l).width))) + 8);
+  canvas.height = Math.ceil(lineH * lines.length + 8);
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return null;
+  ctx.font = font;
+  ctx.fillStyle = opts.color;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  lines.forEach((l, i) => ctx.fillText(l, canvas.width / 2, lineH * (i + 0.5) + 4));
+  return {
+    dataUrl: canvas.toDataURL("image/png"),
+    wIn: canvas.width / (96 * scale),
+    hIn: canvas.height / (96 * scale),
+  };
+}
+
 /** 8.5 x 8.5 inch square book, cover + 24 pages, Amazon KDP ready. */
 export async function exportPdf(book: Book) {
   const S = 8.5;
@@ -39,6 +92,14 @@ export async function exportPdf(book: Book) {
   doc.setFont("helvetica", "bold");
   doc.setFontSize(28);
   doc.text(doc.splitTextToSize(book.title, S - 1), S / 2, S - 1.35, { align: "center" });
+  const coverHindi = await scriptLineImage(book.titleTranslated, {
+    fontPx: 20,
+    maxWidthPx: (S - 1) * 96,
+    color: "#174a2d",
+  });
+  if (coverHindi) {
+    doc.addImage(coverHindi.dataUrl, "PNG", (S - coverHindi.wIn) / 2, S - 1.15, coverHindi.wIn, coverHindi.hIn);
+  }
   doc.setFontSize(12);
   doc.setFont("helvetica", "normal");
   doc.text("Mawil Kids Global Factory - Little Zoologists of the World", S / 2, S - 0.45, {
@@ -52,12 +113,19 @@ export async function exportPdf(book: Book) {
     doc.setFont("helvetica", "bold");
     doc.setFontSize(17);
     doc.text(doc.splitTextToSize(p.en, S - 1.4), S / 2, 5.6, { align: "center" });
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(12);
-    doc.setTextColor(120, 90, 20);
-    // Non-latin scripts are not embedded in core PDF fonts; keep them in the
-    // companion text export and note the line here for the layout artist.
-    doc.text(`[${book.secondLanguage} line - page ${p.page}]`, S / 2, 6.15, { align: "center" });
+    const hindi = await scriptLineImage(p.translated, {
+      fontPx: 15,
+      maxWidthPx: (S - 1.4) * 96,
+      color: "#7a5a14",
+    });
+    if (hindi) {
+      doc.addImage(hindi.dataUrl, "PNG", (S - hindi.wIn) / 2, 5.85, hindi.wIn, hindi.hIn);
+    } else {
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(12);
+      doc.setTextColor(120, 90, 20);
+      doc.text(p.translated, S / 2, 6.15, { align: "center" });
+    }
     doc.setDrawColor(210, 226, 200);
     doc.setFillColor(244, 250, 238);
     doc.roundedRect(0.7, 6.5, S - 1.4, 1.2, 0.12, 0.12, "FD");
