@@ -384,7 +384,7 @@ function Studio() {
                 <div className="min-w-0">
                   <p className="text-xs font-bold tracking-wide text-primary uppercase">Cover</p>
                   <h3 className="text-2xl font-extrabold">{book.title}</h3>
-                  <p className="text-lg font-semibold text-secondary-foreground">
+                  <p className="script-line text-lg font-semibold text-secondary-foreground">
                     {book.titleTranslated}
                   </p>
                   <p className="mt-2 text-sm text-muted-foreground">{book.blurb}</p>
@@ -419,7 +419,7 @@ function Studio() {
                     </div>
                     <div className="space-y-2 p-3">
                       <p className="font-bold">{p.en}</p>
-                      <p className="text-primary">{p.translated}</p>
+                      <p className="script-line text-primary">{p.translated}</p>
                       <p className="rounded-xl bg-secondary p-2 text-xs text-secondary-foreground">
                         🔎 <strong>Fact:</strong> {p.fact}
                       </p>
