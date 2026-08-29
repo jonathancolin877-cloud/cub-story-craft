@@ -297,7 +297,7 @@ function Studio() {
                   </>
                 ) : (
                   <>
-                    <Sparkles className="mr-2 h-4 w-4" /> Generate illustrations
+                    <Sparkles className="mr-2 h-4 w-4" /> Generate All Illustrations
                   </>
                 )}
               </Button>

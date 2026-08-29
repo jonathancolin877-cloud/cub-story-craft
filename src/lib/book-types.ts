@@ -48,6 +48,13 @@ export type Book = {
 
 export const BOOK_STORAGE_KEY = "mawil-current-book";
 
+const REGION_SETTING: Record<Region, string> = {
+  India: "in Indian jungle",
+  MENA: "in a desert oasis",
+  Europe: "in a European forest",
+  USA: "in an American national park",
+};
+
 export function imagePrompt(book: Book, scene: string) {
-  return `${scene}. Character: ${book.characterSheet}. ${STYLE_BASE}`;
+  return `cute baby ${book.animal} named ${book.characterName}, big eyes, consistent character, ${REGION_SETTING[book.region]}, kids book illustration, soft colors, Pixar style, ${scene}. Character sheet: ${book.characterSheet}. ${STYLE_BASE}`;
 }
