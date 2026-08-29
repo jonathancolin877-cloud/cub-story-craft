@@ -442,11 +442,15 @@ function Studio() {
               title="Export PDF"
               sub="24 pages + cover · 8.5×8.5in KDP India"
               onClick={() => {
-                if (!book) return toast.error("Generate a book first");
+                if (!book) {
+                  toast.error("Generate a book first");
+                  return;
+                }
                 const missing = !book.coverImage || book.pages.some((p) => !p.image);
                 if (missing) toast("Exporting with current images");
                 exportPdf(book);
               }}
+
             />
             <ExportButton
               icon={<Film className="h-4 w-4" />}
