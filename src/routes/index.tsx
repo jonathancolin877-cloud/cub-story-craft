@@ -9,6 +9,7 @@ import {
   Film,
   Globe2,
   Loader2,
+  Library,
   Sparkles,
   Wand2,
 } from "lucide-react";
@@ -37,6 +38,7 @@ import {
   type Region,
 } from "@/lib/book-types";
 import { exportPdf, exportReels, exportYoutubeScript } from "@/lib/exports";
+import { fetchLastBook, upsertBook } from "@/lib/book-store";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -67,12 +69,32 @@ function Studio() {
   const [book, setBook] = useState<Book | null>(null);
   const [loading, setLoading] = useState(false);
   const [imgProgress, setImgProgress] = useState<{ done: number; total: number } | null>(null);
+  const [bookId, setBookId] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   const makeBook = useServerFn(generateBook);
   const makeImage = useServerFn(generateIllustration);
 
   const language = LANGUAGE_BY_REGION[region];
   const animals = ANIMALS_BY_REGION[region];
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchLastBook()
+      .then((res) => {
+        if (cancelled || !res) return;
+        setBookId(res.id);
+        setBook(res.book);
+        setRegion(res.book.region);
+        setAnimal(res.book.animal);
+        if (res.book.age) setAge(res.book.age);
+        if (res.book.value) setValue(res.book.value);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (!animals.includes(animal)) setAnimal(animals[0] ?? "");
@@ -114,6 +136,12 @@ function Studio() {
         pages: raw.pages.slice(0, 24).map((p, i) => ({ ...p, page: i + 1 })),
       };
       setBook(next);
+      try {
+        const id = await upsertBook(next, null);
+        setBookId(id);
+      } catch {
+        /* cloud save failed - local copy still works */
+      }
       toast.success(`"${next.title}" is ready. 24 pages written!`);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not generate the book");
@@ -144,11 +172,31 @@ function Studio() {
         setBook(current);
         setImgProgress({ done: i + 2, total });
       }
+      try {
+        const id = await upsertBook(current, bookId);
+        setBookId(id);
+      } catch {
+        /* cloud save failed */
+      }
       toast.success("All 25 illustrations generated!");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Illustration failed");
     } finally {
       setImgProgress(null);
+    }
+  }
+
+  async function onSaveToLibrary() {
+    if (!book) return;
+    setSaving(true);
+    try {
+      const id = await upsertBook(book, bookId, true);
+      setBookId(id);
+      toast.success("Saved to your library. It will still be here in days.");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not save to library");
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -409,6 +457,13 @@ function Studio() {
               sub="15s each · Hook + Fact + CTA + hashtags"
               disabled={!book}
               onClick={() => book && exportReels(book)}
+            />
+            <ExportButton
+              icon={<Library className="h-4 w-4" />}
+              title={saving ? "Saving..." : "Save to Library"}
+              sub="Store this book in the cloud - never resets"
+              disabled={!book || saving}
+              onClick={onSaveToLibrary}
             />
             <Link to="/landing" className="block">
               <ExportButton
