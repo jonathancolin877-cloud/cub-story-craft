@@ -441,39 +441,46 @@ function Studio() {
               icon={<FileText className="h-4 w-4" />}
               title="Export PDF"
               sub="24 pages + cover · 8.5×8.5in KDP India"
-              disabled={!book}
-              onClick={() => book && exportPdf(book)}
+              onClick={() => {
+                if (!book) {
+                  toast.error("Generate a book first");
+                  return;
+                }
+                const missing = !book.coverImage || book.pages.some((p) => !p.image);
+                if (missing) toast("Exporting with current images");
+                exportPdf(book);
+              }}
+
             />
             <ExportButton
               icon={<Film className="h-4 w-4" />}
               title="Export YouTube Script"
               sub={`3 min voiceover · English + ${language.second}`}
-              disabled={!book}
-              onClick={() => book && exportYoutubeScript(book)}
+              onClick={() =>
+                book ? exportYoutubeScript(book) : toast.error("Generate a book first")
+              }
             />
             <ExportButton
               icon={<Sparkles className="h-4 w-4" />}
               title="Export 3 Reels"
               sub="15s each · Hook + Fact + CTA + hashtags"
-              disabled={!book}
-              onClick={() => book && exportReels(book)}
+              onClick={() => (book ? exportReels(book) : toast.error("Generate a book first"))}
             />
             <ExportButton
               icon={<Library className="h-4 w-4" />}
               title={saving ? "Saving..." : "Save to Library"}
               sub="Store this book in the cloud - never resets"
-              disabled={!book || saving}
-              onClick={onSaveToLibrary}
+              onClick={() => (book ? onSaveToLibrary() : toast.error("Generate a book first"))}
             />
             <Link to="/landing" className="block">
               <ExportButton
                 icon={<Globe2 className="h-4 w-4" />}
                 title="Landing Page Link"
                 sub="Cover + Amazon.in buy buttons"
-                disabled={!book}
               />
             </Link>
           </div>
+
           <p className="mt-4 rounded-2xl bg-secondary p-3 text-xs text-secondary-foreground">
             Tip: generate illustrations before exporting the PDF so artwork is embedded.
           </p>
@@ -496,21 +503,18 @@ function ExportButton({
   icon,
   title,
   sub,
-  disabled,
   onClick,
 }: {
   icon: React.ReactNode;
   title: string;
   sub: string;
-  disabled?: boolean;
   onClick?: () => void;
 }) {
   return (
     <button
       type="button"
-      disabled={disabled}
       onClick={onClick}
-      className="w-full rounded-2xl border border-border bg-background p-4 text-left transition-colors hover:bg-secondary disabled:pointer-events-none disabled:opacity-50"
+      className="w-full cursor-pointer rounded-2xl border border-border bg-background p-4 text-left transition-colors hover:bg-secondary"
     >
       <span className="flex items-center gap-2 font-extrabold">
         {icon} {title}
@@ -519,3 +523,4 @@ function ExportButton({
     </button>
   );
 }
+
