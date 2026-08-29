@@ -172,3 +172,8 @@
     box-shadow: var(--shadow-soft);
   }
 }
+
+.script-line {
+  font-family: "Noto Sans Devanagari", "Noto Sans Arabic", Nunito, sans-serif;
+  line-height: 1.7;
+}
