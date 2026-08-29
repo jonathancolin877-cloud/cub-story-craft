@@ -1,7 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { Book, BookPage, Region } from "@/lib/book-types";
 
-type ImagesJson = { cover?: string; pages?: (string | null)[] };
+type ImagesJson = { cover?: string | undefined; pages?: (string | null)[] | undefined };
 
 function split(book: Book) {
   const pages = book.pages.map(({ image, ...rest }) => rest);
@@ -68,9 +68,12 @@ export async function fetchLastBook(): Promise<{ id: string; book: Book } | null
     age: meta["age"] ?? "",
     secondLanguage: meta["secondLanguage"] ?? "",
     coverScene: meta["coverScene"] ?? "",
-    coverImage: images.cover ?? undefined,
+    ...(images.cover ? { coverImage: images.cover } : {}),
     blurb: meta["blurb"] ?? "",
-    pages: rawPages.map((p, i) => ({ ...p, image: images.pages?.[i] ?? undefined })),
+    pages: rawPages.map((p, i) => {
+      const img = images.pages?.[i];
+      return img ? { ...p, image: img } : { ...p, image: undefined as never as string };
+    }),
   };
   return { id: data.id as string, book };
 }
