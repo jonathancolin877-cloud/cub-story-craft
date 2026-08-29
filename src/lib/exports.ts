@@ -99,7 +99,9 @@ export function exportYoutubeScript(book: Book) {
 }
 
 export function exportReels(book: Book) {
-  const picks = [book.pages[3], book.pages[11], book.pages[21]].filter(Boolean);
+  const picks = [book.pages[3], book.pages[11], book.pages[21]].filter(
+    (p): p is (typeof book.pages)[number] => Boolean(p),
+  );
   const hashtags =
     "#KidsBooks #BachonKiKahani #HindiStories #MomsOfIndia #ReadAloud #Amazonindia #KidsOfIndia #Parenting #Wildlife #BedtimeStories";
   const out: string[] = [`3 x 15-SECOND REELS - ${book.title}`, ""];
