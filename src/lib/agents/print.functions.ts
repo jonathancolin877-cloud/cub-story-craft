@@ -250,6 +250,36 @@ export const buildPrintPdf = createServerFn({ method: "POST" })
       return y;
     };
 
+    const wrapDeva = (text: string, size: number, maxW: number) => {
+      const out: string[] = [];
+      let line = "";
+      for (const word of text.split(/\s+/).filter(Boolean)) {
+        const cand = line ? `${line} ${word}` : word;
+        if (measureDeva(cand, size) > maxW && line) {
+          out.push(line);
+          line = word;
+        } else line = cand;
+      }
+      if (line) out.push(line);
+      return out;
+    };
+
+    const drawCenteredDeva = (
+      page: ReturnType<typeof newPage>,
+      text: string,
+      size: number,
+      top: number,
+      color: Rgb,
+    ) => {
+      let y = top;
+      for (const line of wrapDeva(text, size, SAFE_W)) {
+        drawDeva(page, line, size, (PAGE_PT - measureDeva(line, size)) / 2, y, color);
+        y -= size * 1.45;
+      }
+      return y;
+    };
+
+
     // ---- Cover (full-bleed square) ----
     const cover = newPage();
     await drawImage(cover, data.coverPath, 0, 0, PAGE_PT);
