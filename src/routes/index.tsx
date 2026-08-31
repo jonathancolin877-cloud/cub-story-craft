@@ -24,7 +24,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
-import { generateBook, generateIllustration } from "@/lib/book.functions";
+import { generateBook } from "@/lib/book.functions";
+import { illustratorAgent } from "@/lib/agents/illustrator.functions";
+import { characterBible } from "@/lib/book-types";
 import {
   AGES,
   ANIMALS_BY_REGION,
@@ -88,7 +90,7 @@ function Studio() {
 
 
   const makeBook = useServerFn(generateBook);
-  const makeImage = useServerFn(generateIllustration);
+  const makeImage = useServerFn(illustratorAgent);
 
   const language = LANGUAGE_BY_REGION[region];
   const animals = ANIMALS_BY_REGION[region];
@@ -179,7 +181,11 @@ function Studio() {
     let current = book;
     try {
       const cover = await makeImage({
-        data: { prompt: `Book cover illustration. ${imagePrompt(book, book.coverScene)}` },
+        data: {
+          scene: `Book cover illustration. ${book.coverScene}`,
+          characterBible: characterBible(book),
+          characterSheet: book.characterSheet,
+        },
       });
       current = { ...current, coverImage: cover.image };
       setBook(current);
@@ -187,7 +193,13 @@ function Studio() {
 
       for (let i = 0; i < current.pages.length; i++) {
         const page = current.pages[i]!;
-        const res = await makeImage({ data: { prompt: imagePrompt(current, page.scene) } });
+        const res = await makeImage({
+          data: {
+            scene: page.scene,
+            characterBible: characterBible(current),
+            characterSheet: current.characterSheet,
+          },
+        });
         const pages = [...current.pages];
         pages[i] = { ...page, image: res.image };
         current = { ...current, pages };
