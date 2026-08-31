@@ -86,11 +86,34 @@ export const buildPrintPdf = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => Input.parse(d))
   .handler(async ({ data, context }) => {
-    const { PDFDocument, PDFName, PDFString, PDFArray, PDFNumber, rgb } = await import("pdf-lib");
+    const {
+      PDFDocument,
+      PDFName,
+      PDFString,
+      PDFArray,
+      PDFNumber,
+      PDFHexString,
+      rgb,
+      pushGraphicsState,
+      popGraphicsState,
+      beginText,
+      endText,
+      setFontAndSize,
+      setFillingRgbColor,
+      moveText,
+      showText,
+    } = await import("pdf-lib");
     const fontkitMod = (await import("fontkit")) as unknown as Record<string, unknown>;
-    const fontkit = ((fontkitMod["default"] ?? fontkitMod) as Record<string, unknown>) as unknown as Parameters<
-      Awaited<ReturnType<typeof PDFDocument.create>>["registerFontkit"]
-    >[0];
+    const fontkit = (fontkitMod["default"] ?? fontkitMod) as {
+      create(data: Uint8Array): {
+        unitsPerEm: number;
+        layout(text: string): {
+          glyphs: { id: number }[];
+          positions: { xAdvance: number; yAdvance: number; xOffset: number; yOffset: number }[];
+          advanceWidth: number;
+        };
+      };
+    };
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
@@ -103,17 +126,59 @@ export const buildPrintPdf = createServerFn({ method: "POST" })
     };
 
     const doc = await PDFDocument.create();
-    doc.registerFontkit(fontkit);
-    const diag = `fontkit=${typeof fontkit} keys=${fontkit ? Object.keys(fontkit as object).slice(0, 6).join(",") : "none"} registered=${Boolean((doc as unknown as { fontkit?: unknown }).fontkit)}`;
+    doc.registerFontkit(
+      fontkit as unknown as Parameters<(typeof doc)["registerFontkit"]>[0],
+    );
     // subset: false -> the complete font program is embedded (FontFile2)
-    let latin, latinBold, deva;
-    try {
-      latin = await doc.embedFont(await loadFont(FONT_URLS.latin), { subset: false });
-      latinBold = await doc.embedFont(await loadFont(FONT_URLS.latinBold), { subset: false });
-      deva = await doc.embedFont(await loadFont(FONT_URLS.devanagari), { subset: false });
-    } catch (e) {
-      throw new Error(`${e instanceof Error ? e.message : String(e)} :: ${diag}`);
-    }
+    const latin = await doc.embedFont(await loadFont(FONT_URLS.latin), { subset: false });
+    const latinBold = await doc.embedFont(await loadFont(FONT_URLS.latinBold), { subset: false });
+    const devaBytes = await loadFont(FONT_URLS.devanagari);
+    const deva = await doc.embedFont(devaBytes, { subset: false });
+    // Devanagari needs full GSUB/GPOS shaping (matra reordering + mark
+    // attachment), so glyphs are positioned individually instead of relying
+    // on pdf-lib's simple advance-width text showing.
+    const shaper = fontkit.create(new Uint8Array(devaBytes));
+    const emScale = (size: number) => size / shaper.unitsPerEm;
+
+    const measureDeva = (text: string, size: number) =>
+      shaper.layout(text).advanceWidth * emScale(size);
+
+    const drawDeva = (
+      page: ReturnType<typeof doc.addPage>,
+      text: string,
+      size: number,
+      x: number,
+      y: number,
+      color: Rgb,
+    ) => {
+      const run = shaper.layout(text);
+      const s = emScale(size);
+      const key = page.node.newFontDictionary(deva.name, deva.ref);
+      const ops: unknown[] = [
+        pushGraphicsState(),
+        beginText(),
+        setFillingRgbColor(color[0], color[1], color[2]),
+        setFontAndSize(key, size),
+      ];
+      let penX = x;
+      let penY = y;
+      let curX = 0;
+      let curY = 0;
+      run.glyphs.forEach((glyph, i) => {
+        const pos = run.positions[i]!;
+        const gx = penX + pos.xOffset * s;
+        const gy = penY + pos.yOffset * s;
+        ops.push(moveText(gx - curX, gy - curY));
+        curX = gx;
+        curY = gy;
+        ops.push(showText(PDFHexString.of(glyph.id.toString(16).padStart(4, "0"))));
+        penX += pos.xAdvance * s;
+        penY += (pos.yAdvance || 0) * s;
+      });
+      ops.push(endText(), popGraphicsState());
+      page.pushOperators(...(ops as Parameters<typeof page.pushOperators>));
+    };
+
 
     let smallestImagePx = Infinity;
     let embeddedImages = 0;
