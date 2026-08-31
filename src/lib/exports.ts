@@ -66,79 +66,112 @@ async function scriptLineImage(
   };
 }
 
-/** 8.5 x 8.5 inch square book, cover + 24 pages, Amazon KDP ready. */
+/** Upscale a square illustration to the 300 DPI print size (2550x2550). */
+async function upscaleSquare(src: string, px = PRINT_SPEC.printPx): Promise<string> {
+  try {
+    const img = new Image();
+    img.src = src;
+    await img.decode();
+    const canvas = document.createElement("canvas");
+    canvas.width = px;
+    canvas.height = px;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return src;
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+    // source is 1:1, so this is a pure upscale - never a crop
+    ctx.drawImage(img, 0, 0, px, px);
+    return canvas.toDataURL("image/jpeg", 0.92);
+  } catch {
+    return src;
+  }
+}
+
+/**
+ * 8.5 x 8.5 inch trim + 0.125in bleed on every side (8.75 x 8.75 page),
+ * cover + 24 pages, all illustrations 1:1 square at 300 DPI. Amazon KDP ready.
+ */
 export async function exportPdf(book: Book) {
-  const S = 8.5;
+  const TRIM = PRINT_SPEC.trimIn;
+  const B = PRINT_SPEC.bleedIn;
+  const S = TRIM + B * 2; // full page incl. bleed
   const doc = new jsPDF({ unit: "in", format: [S, S] });
 
-  const drawImage = (img: string | undefined, x: number, y: number, w: number, h: number) => {
+  const drawSquare = async (img: string | undefined, x: number, y: number, size: number) => {
     if (img) {
       try {
-        doc.addImage(img, "PNG", x, y, w, h);
+        const hi = await upscaleSquare(img);
+        doc.addImage(hi, "JPEG", x, y, size, size);
         return;
       } catch {
         /* fall through to placeholder */
       }
     }
     doc.setFillColor(238, 242, 230);
-    doc.rect(x, y, w, h, "F");
+    doc.rect(x, y, size, size, "F");
   };
 
-  // Cover
-  drawImage(book.coverImage, 0, 0, S, S);
+  // Cover - full bleed square
+  await drawSquare(book.coverImage, 0, 0, S);
   doc.setFillColor(255, 255, 255);
-  doc.rect(0, S - 2.1, S, 2.1, "F");
+  doc.rect(0, S - 2.2, S, 2.2, "F");
   doc.setTextColor(23, 74, 45);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(28);
-  doc.text(doc.splitTextToSize(book.title, S - 1), S / 2, S - 1.35, { align: "center" });
+  doc.text(doc.splitTextToSize(book.title, S - 1), S / 2, S - 1.45, { align: "center" });
   const coverHindi = await scriptLineImage(book.titleTranslated, {
     fontPx: 20,
     maxWidthPx: (S - 1) * 96,
     color: "#174a2d",
   });
   if (coverHindi) {
-    doc.addImage(coverHindi.dataUrl, "PNG", (S - coverHindi.wIn) / 2, S - 1.15, coverHindi.wIn, coverHindi.hIn);
+    doc.addImage(coverHindi.dataUrl, "PNG", (S - coverHindi.wIn) / 2, S - 1.25, coverHindi.wIn, coverHindi.hIn);
   }
   doc.setFontSize(12);
   doc.setFont("helvetica", "normal");
-  doc.text("Mawil Kids Global Factory - Little Zoologists of the World", S / 2, S - 0.45, {
+  doc.text("Mawil Kids Global Factory - Little Zoologists of the World", S / 2, S - 0.55, {
     align: "center",
   });
 
+  const imgSize = 5.5; // square, no crop
+  const imgX = (S - imgSize) / 2;
+  const imgY = B + 0.35;
+
   for (const p of book.pages) {
     doc.addPage([S, S], "portrait");
-    drawImage(p.image, 0.5, 0.5, S - 1, 4.6);
+    await drawSquare(p.image, imgX, imgY, imgSize);
+    const textTop = imgY + imgSize + 0.45;
     doc.setTextColor(23, 74, 45);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(17);
-    doc.text(doc.splitTextToSize(p.en, S - 1.4), S / 2, 5.6, { align: "center" });
+    doc.text(doc.splitTextToSize(p.en, S - 1.6), S / 2, textTop, { align: "center" });
     const hindi = await scriptLineImage(p.translated, {
       fontPx: 15,
-      maxWidthPx: (S - 1.4) * 96,
+      maxWidthPx: (S - 1.6) * 96,
       color: "#7a5a14",
     });
     if (hindi) {
-      doc.addImage(hindi.dataUrl, "PNG", (S - hindi.wIn) / 2, 5.85, hindi.wIn, hindi.hIn);
+      doc.addImage(hindi.dataUrl, "PNG", (S - hindi.wIn) / 2, textTop + 0.25, hindi.wIn, hindi.hIn);
     } else {
       doc.setFont("helvetica", "normal");
       doc.setFontSize(12);
       doc.setTextColor(120, 90, 20);
-      doc.text(p.translated, S / 2, 6.15, { align: "center" });
+      doc.text(p.translated, S / 2, textTop + 0.55, { align: "center" });
     }
     doc.setDrawColor(210, 226, 200);
     doc.setFillColor(244, 250, 238);
-    doc.roundedRect(0.7, 6.5, S - 1.4, 1.2, 0.12, 0.12, "FD");
+    doc.roundedRect(0.8, S - B - 1.75, S - 1.6, 1.15, 0.12, 0.12, "FD");
     doc.setTextColor(40, 80, 55);
     doc.setFontSize(10);
-    doc.text(doc.splitTextToSize(`Did you know? ${p.fact}`, S - 1.8), 0.9, 6.95);
+    doc.text(doc.splitTextToSize(`Did you know? ${p.fact}`, S - 2), 1.0, S - B - 1.3);
     doc.setFontSize(9);
     doc.setTextColor(150, 150, 150);
-    doc.text(String(p.page), S / 2, S - 0.3, { align: "center" });
+    doc.text(String(p.page), S / 2, S - B - 0.25, { align: "center" });
   }
 
-  doc.save(`${slug(book.title)}-kdp-8.5x8.5.pdf`);
+  doc.save(`${slug(book.title)}-kdp-8.5x8.5-bleed.pdf`);
 }
+
 
 export function exportYoutubeScript(book: Book) {
   const lines: string[] = [];
