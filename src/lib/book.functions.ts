@@ -10,8 +10,6 @@ const GenerateInput = z.object({
   characterName: z.string().optional(),
 });
 
-const ImageInput = z.object({ prompt: z.string().min(4) });
-
 function key() {
   const k = process.env["LOVABLE_API_KEY"];
   if (!k) throw new Error("Missing LOVABLE_API_KEY");
@@ -86,29 +84,4 @@ Exactly 24 pages.`;
       coverScene: string;
       pages: { page: number; en: string; translated: string; fact: string; scene: string }[];
     };
-  });
-
-export const generateIllustration = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) => ImageInput.parse(d))
-  .handler(async ({ data }) => {
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/images/generations", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${key()}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "openai/gpt-image-1-mini",
-        prompt: data.prompt,
-        quality: "low",
-        size: "1024x1024",
-        n: 1,
-      }),
-    });
-
-    if (!res.ok) throw new Error(await gatewayError(res));
-    const json = await res.json();
-    const b64 = json.data?.[0]?.b64_json;
-    if (!b64) throw new Error("No image returned");
-    return { image: `data:image/png;base64,${b64}` };
   });

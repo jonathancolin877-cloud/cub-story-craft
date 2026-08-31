@@ -66,7 +66,7 @@ async function scriptLineImage(
   };
 }
 
-/** Upscale a square illustration to the 300 DPI print size (2550x2550). */
+/** Upscale a square illustration to the 300 DPI print size (2625x2625, 8.75in incl. bleed). */
 async function upscaleSquare(src: string, px = PRINT_SPEC.printPx): Promise<string> {
   try {
     const img = new Image();
@@ -89,13 +89,18 @@ async function upscaleSquare(src: string, px = PRINT_SPEC.printPx): Promise<stri
 
 /**
  * 8.5 x 8.5 inch trim + 0.125in bleed on every side (8.75 x 8.75 page),
- * cover + 24 pages, all illustrations 1:1 square at 300 DPI. Amazon KDP ready.
+ * 0.5in safe margin, cover + 24 pages, all illustrations 1:1 square at
+ * 2625x2625 (300 DPI). Amazon KDP ready.
  */
-export async function exportPdf(book: Book) {
+export async function buildKdpPdf(book: Book) {
   const TRIM = PRINT_SPEC.trimIn;
   const B = PRINT_SPEC.bleedIn;
+  const M = PRINT_SPEC.safeMarginIn;
   const S = TRIM + B * 2; // full page incl. bleed
+  const safeL = B + M;
+  const safeW = S - safeL * 2;
   const doc = new jsPDF({ unit: "in", format: [S, S] });
+  doc.setProperties({ title: book.title, subject: "PDF/X-1a:2001", creator: "Mawil Kids Global Factory" });
 
   const drawSquare = async (img: string | undefined, x: number, y: number, size: number) => {
     if (img) {
@@ -118,10 +123,10 @@ export async function exportPdf(book: Book) {
   doc.setTextColor(23, 74, 45);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(28);
-  doc.text(doc.splitTextToSize(book.title, S - 1), S / 2, S - 1.45, { align: "center" });
+  doc.text(doc.splitTextToSize(book.title, safeW), S / 2, S - 1.45, { align: "center" });
   const coverHindi = await scriptLineImage(book.titleTranslated, {
     fontPx: 20,
-    maxWidthPx: (S - 1) * 96,
+    maxWidthPx: safeW * 96,
     color: "#174a2d",
   });
   if (coverHindi) {
@@ -129,25 +134,25 @@ export async function exportPdf(book: Book) {
   }
   doc.setFontSize(12);
   doc.setFont("helvetica", "normal");
-  doc.text("Mawil Kids Global Factory - Little Zoologists of the World", S / 2, S - 0.55, {
+  doc.text("Mawil Kids Global Factory - Little Zoologists of the World", S / 2, S - 0.6, {
     align: "center",
   });
 
   const imgSize = 5.5; // square, no crop
   const imgX = (S - imgSize) / 2;
-  const imgY = B + 0.35;
+  const imgY = safeL;
 
   for (const p of book.pages) {
     doc.addPage([S, S], "portrait");
     await drawSquare(p.image, imgX, imgY, imgSize);
-    const textTop = imgY + imgSize + 0.45;
+    const textTop = imgY + imgSize + 0.4;
     doc.setTextColor(23, 74, 45);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(17);
-    doc.text(doc.splitTextToSize(p.en, S - 1.6), S / 2, textTop, { align: "center" });
+    doc.text(doc.splitTextToSize(p.en, safeW), S / 2, textTop, { align: "center" });
     const hindi = await scriptLineImage(p.translated, {
       fontPx: 15,
-      maxWidthPx: (S - 1.6) * 96,
+      maxWidthPx: safeW * 96,
       color: "#7a5a14",
     });
     if (hindi) {
@@ -160,17 +165,34 @@ export async function exportPdf(book: Book) {
     }
     doc.setDrawColor(210, 226, 200);
     doc.setFillColor(244, 250, 238);
-    doc.roundedRect(0.8, S - B - 1.75, S - 1.6, 1.15, 0.12, 0.12, "FD");
+    doc.roundedRect(safeL, S - safeL - 1.3, safeW, 1.05, 0.12, 0.12, "FD");
     doc.setTextColor(40, 80, 55);
     doc.setFontSize(10);
-    doc.text(doc.splitTextToSize(`Did you know? ${p.fact}`, S - 2), 1.0, S - B - 1.3);
+    doc.text(doc.splitTextToSize(`Did you know? ${p.fact}`, safeW - 0.4), safeL + 0.2, S - safeL - 0.95);
     doc.setFontSize(9);
     doc.setTextColor(150, 150, 150);
-    doc.text(String(p.page), S / 2, S - B - 0.25, { align: "center" });
+    doc.text(String(p.page), S / 2, S - safeL + 0.1, { align: "center" });
   }
 
-  doc.save(`${slug(book.title)}-kdp-8.5x8.5-bleed.pdf`);
+  return {
+    doc,
+    filename: `${slug(book.title)}-kdp-8.5x8.5-bleed.pdf`,
+    meta: {
+      pageCount: book.pages.length + 1,
+      pageSizeIn: S,
+      trimIn: TRIM,
+      bleedIn: B,
+      safeMarginIn: M,
+      imagePx: PRINT_SPEC.printPx,
+    },
+  };
 }
+
+export async function exportPdf(book: Book) {
+  const { doc, filename } = await buildKdpPdf(book);
+  doc.save(filename);
+}
+
 
 
 export function exportYoutubeScript(book: Book) {

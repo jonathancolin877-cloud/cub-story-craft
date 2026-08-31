@@ -24,7 +24,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
-import { generateBook, generateIllustration } from "@/lib/book.functions";
+import { generateBook } from "@/lib/book.functions";
+import { illustratorAgent } from "@/lib/agents/illustrator.functions";
+import { characterBible } from "@/lib/book-types";
 import {
   AGES,
   ANIMALS_BY_REGION,
@@ -35,7 +37,6 @@ import {
   REGIONS,
   STYLE_BASE,
   VALUES,
-  imagePrompt,
   type Book,
   type Region,
 } from "@/lib/book-types";
@@ -88,7 +89,7 @@ function Studio() {
 
 
   const makeBook = useServerFn(generateBook);
-  const makeImage = useServerFn(generateIllustration);
+  const makeImage = useServerFn(illustratorAgent);
 
   const language = LANGUAGE_BY_REGION[region];
   const animals = ANIMALS_BY_REGION[region];
@@ -179,7 +180,11 @@ function Studio() {
     let current = book;
     try {
       const cover = await makeImage({
-        data: { prompt: `Book cover illustration. ${imagePrompt(book, book.coverScene)}` },
+        data: {
+          scene: `Book cover illustration. ${book.coverScene}`,
+          characterBible: characterBible(book),
+          characterSheet: book.characterSheet,
+        },
       });
       current = { ...current, coverImage: cover.image };
       setBook(current);
@@ -187,7 +192,13 @@ function Studio() {
 
       for (let i = 0; i < current.pages.length; i++) {
         const page = current.pages[i]!;
-        const res = await makeImage({ data: { prompt: imagePrompt(current, page.scene) } });
+        const res = await makeImage({
+          data: {
+            scene: page.scene,
+            characterBible: characterBible(current),
+            characterSheet: current.characterSheet,
+          },
+        });
         const pages = [...current.pages];
         pages[i] = { ...page, image: res.image };
         current = { ...current, pages };
@@ -398,10 +409,11 @@ function Studio() {
             </div>
 
             <p className="rounded-2xl bg-secondary p-3 text-xs leading-relaxed text-secondary-foreground">
-              <strong>Illustration spec (locked):</strong> 1:1 square, min{" "}
-              {PRINT_SPEC.minPx}px, upscaled to {PRINT_SPEC.printPx}×{PRINT_SPEC.printPx} for 300
-              DPI, {PRINT_SPEC.bleedIn}in bleed. {STYLE_BASE}
+              <strong>Illustration spec (locked):</strong> 1:1 square, upscaled to{" "}
+              {PRINT_SPEC.printPx}×{PRINT_SPEC.printPx} for 300 DPI, {PRINT_SPEC.bleedIn}in bleed,{" "}
+              {PRINT_SPEC.safeMarginIn}in safe margin. {STYLE_BASE}
             </p>
+
 
           </div>
         </section>
