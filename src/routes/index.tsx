@@ -39,6 +39,7 @@ import {
 } from "@/lib/book-types";
 import { exportPdf, exportReels, exportYoutubeScript } from "@/lib/exports";
 import { fetchLastBook, upsertBook } from "@/lib/book-store";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -139,8 +140,10 @@ function Studio() {
       try {
         const id = await upsertBook(next, null);
         setBookId(id);
-      } catch {
-        /* cloud save failed - local copy still works */
+      } catch (err) {
+        toast.error(
+          err instanceof Error ? err.message : "Could not save to the cloud",
+        );
       }
       toast.success(`"${next.title}" is ready. 24 pages written!`);
     } catch (e) {
@@ -175,8 +178,8 @@ function Studio() {
       try {
         const id = await upsertBook(current, bookId);
         setBookId(id);
-      } catch {
-        /* cloud save failed */
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Could not save to the cloud");
       }
       toast.success("All 25 illustrations generated!");
     } catch (e) {
@@ -200,6 +203,15 @@ function Studio() {
     }
   }
 
+  const [email, setEmail] = useState<string | null>(null);
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => setEmail(data.session?.user.email ?? null));
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) =>
+      setEmail(session?.user.email ?? null),
+    );
+    return () => sub.subscription.unsubscribe();
+  }, []);
+
   const chapter = useMemo(
     () => (n: number) =>
       n <= 3 ? "Intro" : n <= 18 ? "Challenge" : n <= 22 ? "Lesson" : "Moral",
@@ -220,6 +232,25 @@ function Studio() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            {email ? (
+              <button
+                type="button"
+                onClick={async () => {
+                  await supabase.auth.signOut();
+                  toast.success("Signed out");
+                }}
+                className="cursor-pointer rounded-full bg-background/20 px-4 py-2 text-sm font-bold text-primary-foreground"
+              >
+                Sign out
+              </button>
+            ) : (
+              <Link
+                to="/auth"
+                className="rounded-full bg-background/20 px-4 py-2 text-sm font-bold text-primary-foreground"
+              >
+                Sign in
+              </Link>
+            )}
             <Link
               to="/library"
               className="rounded-full bg-background/20 px-4 py-2 text-sm font-bold text-primary-foreground"
