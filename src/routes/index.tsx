@@ -42,7 +42,7 @@ import {
 } from "@/lib/book-types";
 import { exportReels, exportYoutubeScript } from "@/lib/exports";
 import { agents, type KdpReport } from "@/agents/client";
-import { fetchLastBook, upsertBook } from "@/lib/book-store";
+import { fetchLastBook, saveArtwork, upsertBook } from "@/lib/book-store";
 import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/")({
@@ -208,7 +208,12 @@ function Studio() {
     const total = book.pages.length + 1;
     setImgProgress({ done: 0, total });
     let current = book;
+    let id = bookId;
     try {
+      if (!id) {
+        id = await upsertBook(current, null);
+        setBookId(id);
+      }
       const cover = await makeImage({
         data: {
           scene: `Book cover illustration. ${book.coverScene}`,
@@ -219,6 +224,7 @@ function Studio() {
       current = { ...current, coverImage: cover.image };
       setBook(current);
       setImgProgress({ done: 1, total });
+      await saveArtwork(id, cover.image, { kind: "cover" });
 
       for (let i = 0; i < current.pages.length; i++) {
         const page = current.pages[i]!;
@@ -234,20 +240,16 @@ function Studio() {
         current = { ...current, pages };
         setBook(current);
         setImgProgress({ done: i + 2, total });
+        await saveArtwork(id, res.image, { kind: "page", index: i, page: page.page });
       }
-      try {
-        const id = await upsertBook(current, bookId);
-        setBookId(id);
-      } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Could not save to the cloud");
-      }
-      toast.success("All 25 illustrations generated!");
+      toast.success("All 25 illustrations generated and saved!");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Illustration failed");
     } finally {
       setImgProgress(null);
     }
   }
+
 
   async function onSaveToLibrary() {
     if (!book) return;

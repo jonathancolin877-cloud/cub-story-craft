@@ -1,0 +1,4 @@
+create policy "book art owner read" on storage.objects for select to authenticated using (bucket_id = 'book-art' and (storage.foldername(name))[1] = auth.uid()::text);
+create policy "book art owner insert" on storage.objects for insert to authenticated with check (bucket_id = 'book-art' and (storage.foldername(name))[1] = auth.uid()::text);
+create policy "book art owner update" on storage.objects for update to authenticated using (bucket_id = 'book-art' and (storage.foldername(name))[1] = auth.uid()::text) with check (bucket_id = 'book-art' and (storage.foldername(name))[1] = auth.uid()::text);
+create policy "book art owner delete" on storage.objects for delete to authenticated using (bucket_id = 'book-art' and (storage.foldername(name))[1] = auth.uid()::text);
