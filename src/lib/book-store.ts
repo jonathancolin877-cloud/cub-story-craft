@@ -36,12 +36,20 @@ export async function upsertBook(book: Book, id: string | null, saved = false) {
     updated_at: new Date().toISOString(),
   };
 
+  const { data: sessionData } = await supabase.auth.getSession();
+  const userId = sessionData.session?.user.id;
+  if (!userId) throw new Error("Sign in to save your books.");
+
   if (id) {
     const { error } = await supabase.from("books").update(row).eq("id", id);
     if (error) throw new Error(error.message);
     return id;
   }
-  const { data, error } = await supabase.from("books").insert(row).select("id").single();
+  const { data, error } = await supabase
+    .from("books")
+    .insert({ ...row, user_id: userId })
+    .select("id")
+    .single();
   if (error) throw new Error(error.message);
   return data.id as string;
 }
