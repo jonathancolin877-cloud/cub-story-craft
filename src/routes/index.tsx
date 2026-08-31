@@ -37,7 +37,6 @@ import {
   REGIONS,
   STYLE_BASE,
   VALUES,
-  imagePrompt,
   type Book,
   type Region,
 } from "@/lib/book-types";
