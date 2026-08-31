@@ -18,8 +18,24 @@ export const LANGUAGE_BY_REGION: Record<Region, { label: string; second: string 
 export const VALUES = ["Courage", "Patience", "Kindness", "Teamwork"] as const;
 export const AGES = ["3-5 years", "6-8 years"] as const;
 
+/** IMMUTABLE PRINT SPEC - all illustrations are 1:1 square. */
+export const PRINT_SPEC = {
+  aspect: "1:1",
+  minPx: 1024,
+  printPx: 2550, // 8.5in @ 300 DPI
+  trimIn: 8.5,
+  bleedIn: 0.125,
+} as const;
+
 export const STYLE_BASE =
-  "cute baby, big eyes, consistent character, kids book illustration, soft colors, Pixar style --ar 4:3";
+  "square 1:1 composition, full square frame, nothing important near the edges (0.125 inch bleed safe), kids book illustration, soft colors, Pixar storybook 2D, no text in image";
+
+/** Locked character bible - keeps every page on-model. */
+export const CHARACTER_BIBLE: Record<string, string> = {
+  Tiger:
+    "Cute baby tiger cub Sheru, orange with black stripes, white belly, pink nose, small rounded ears, big amber eyes, same proportions every page, Pixar storybook 2D, soft colors, lush Indian jungle background, no text in image",
+};
+
 
 export type BookPage = {
   page: number;
