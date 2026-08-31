@@ -1,5 +1,5 @@
 import { jsPDF } from "jspdf";
-import type { Book } from "./book-types";
+import { PRINT_SPEC, type Book } from "./book-types";
 
 function download(name: string, content: string, type = "text/plain;charset=utf-8") {
   const blob = new Blob([content], { type });
