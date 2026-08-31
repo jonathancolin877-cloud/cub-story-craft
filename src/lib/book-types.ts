@@ -74,6 +74,8 @@ export type Book = {
 };
 
 export const BOOK_STORAGE_KEY = "mawil-current-book";
+/** Book 1 must pass the KDP validator before Book 2 may be generated. */
+export const KDP_VALIDATED_KEY = "mawil-book1-kdp-validated";
 
 const REGION_SETTING: Record<Region, string> = {
   India: "in Indian jungle",
@@ -82,6 +84,14 @@ const REGION_SETTING: Record<Region, string> = {
   USA: "in an American national park",
 };
 
-export function imagePrompt(book: Book, scene: string) {
-  return `cute baby ${book.animal} named ${book.characterName}, big eyes, consistent character, ${REGION_SETTING[book.region]}, kids book illustration, soft colors, Pixar style, ${scene}. Character sheet: ${book.characterSheet}. ${STYLE_BASE}`;
+export function characterBible(book: Book) {
+  return (
+    CHARACTER_BIBLE[book.animal] ??
+    `Cute baby ${book.animal} named ${book.characterName}, big eyes, same proportions every page, Pixar storybook 2D, soft colors, ${REGION_SETTING[book.region]} background, no text in image`
+  );
 }
+
+export function imagePrompt(book: Book, scene: string) {
+  return `${characterBible(book)}. Scene: ${scene}. Character sheet: ${book.characterSheet}. ${STYLE_BASE}`;
+}
+
