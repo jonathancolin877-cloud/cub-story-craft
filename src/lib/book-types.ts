@@ -30,7 +30,18 @@ export type BookPage = {
   image?: string | undefined;
 };
 
+export const BOOK_STATUSES = ["draft", "in_production", "live"] as const;
+export type BookStatus = (typeof BOOK_STATUSES)[number];
+
+export const STATUS_LABEL: Record<BookStatus, string> = {
+  draft: "DRAFT",
+  in_production: "IN PRODUCTION",
+  live: "LIVE",
+};
+
 export type Book = {
+  status?: BookStatus;
+  bookNumber?: number | null;
   title: string;
   titleTranslated: string;
   characterName: string;

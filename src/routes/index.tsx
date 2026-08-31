@@ -219,12 +219,20 @@ function Studio() {
               <p className="text-sm opacity-90">Little Zoologists of the World</p>
             </div>
           </div>
-          <Link
-            to="/landing"
-            className="rounded-full bg-sunshine px-4 py-2 text-sm font-bold text-accent-foreground"
-          >
-            View landing page
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link
+              to="/library"
+              className="rounded-full bg-background/20 px-4 py-2 text-sm font-bold text-primary-foreground"
+            >
+              Library
+            </Link>
+            <Link
+              to="/landing"
+              className="rounded-full bg-sunshine px-4 py-2 text-sm font-bold text-accent-foreground"
+            >
+              View landing page
+            </Link>
+          </div>
         </div>
       </header>
 
