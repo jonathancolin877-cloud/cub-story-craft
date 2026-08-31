@@ -74,6 +74,18 @@ function Studio() {
   const [imgProgress, setImgProgress] = useState<{ done: number; total: number } | null>(null);
   const [bookId, setBookId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [kdpValidated, setKdpValidated] = useState(false);
+
+  useEffect(() => {
+    try {
+      setKdpValidated(localStorage.getItem(KDP_VALIDATED_KEY) === "1");
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  const book2Blocked = Boolean(book) && !kdpValidated;
+
 
   const makeBook = useServerFn(generateBook);
   const makeImage = useServerFn(generateIllustration);
