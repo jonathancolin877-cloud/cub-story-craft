@@ -40,7 +40,8 @@ import {
   type Book,
   type Region,
 } from "@/lib/book-types";
-import { exportPdf, exportReels, exportYoutubeScript } from "@/lib/exports";
+import { exportReels, exportYoutubeScript } from "@/lib/exports";
+import { agents, type KdpReport } from "@/agents/client";
 import { fetchLastBook, upsertBook } from "@/lib/book-store";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -76,6 +77,8 @@ function Studio() {
   const [bookId, setBookId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [kdpValidated, setKdpValidated] = useState(false);
+  const [printing, setPrinting] = useState<string | null>(null);
+  const [kdpReport, setKdpReport] = useState<KdpReport | null>(null);
 
   useEffect(() => {
     try {
@@ -90,6 +93,33 @@ function Studio() {
 
   const makeBook = useServerFn(generateBook);
   const makeImage = useServerFn(illustratorAgent);
+
+  async function onExportPrintPdf() {
+    if (!book) {
+      toast.error("Generate a book first");
+      return;
+    }
+    if (!book.coverImage || book.pages.some((p) => !p.image)) {
+      toast("Exporting with current images");
+    }
+    setKdpReport(null);
+    try {
+      setPrinting("Preparing 2625px art...");
+      const layout = await agents.layout(book, (done, total) =>
+        setPrinting(`Uploading print art ${done}/${total}...`),
+      );
+      setPrinting("Validating PDF/X-1a...");
+      const report = await agents.validate(book, layout);
+      setKdpReport(report);
+      layout.save();
+      if (report.pass) toast.success("PDF/X-1a exported and validated");
+      else toast.error("PDF exported but KDP validation failed - see report");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "PDF export failed");
+    } finally {
+      setPrinting(null);
+    }
+  }
 
   const language = LANGUAGE_BY_REGION[region];
   const animals = ANIMALS_BY_REGION[region];
@@ -533,17 +563,9 @@ function Studio() {
           <div className="space-y-3">
             <ExportButton
               icon={<FileText className="h-4 w-4" />}
-              title="Export PDF"
-              sub="24 pages + cover · 8.5×8.5in KDP India"
-              onClick={() => {
-                if (!book) {
-                  toast.error("Generate a book first");
-                  return;
-                }
-                const missing = !book.coverImage || book.pages.some((p) => !p.image);
-                if (missing) toast("Exporting with current images");
-                exportPdf(book);
-              }}
+              title={printing ?? "Export PDF (PDF/X-1a)"}
+              sub="Server-built · embedded fonts · 2625px images · 8.5×8.5in + bleed"
+              onClick={() => void onExportPrintPdf()}
 
             />
             <ExportButton
@@ -575,6 +597,18 @@ function Studio() {
             </Link>
           </div>
 
+          {kdpReport && (
+            <div className="mt-4 space-y-1 rounded-2xl border border-border bg-background p-3 text-xs">
+              <p className="font-bold">
+                KDP validator: {kdpReport.pass ? "PASS" : "FAIL - publish blocked"}
+              </p>
+              {kdpReport.checks.map((c) => (
+                <p key={c.id} className={c.pass ? "text-primary" : "text-destructive"}>
+                  {c.pass ? "✓" : "✕"} {c.label} — {c.detail}
+                </p>
+              ))}
+            </div>
+          )}
           <p className="mt-4 rounded-2xl bg-secondary p-3 text-xs text-secondary-foreground">
             Tip: generate illustrations before exporting the PDF so artwork is embedded.
           </p>
