@@ -28,6 +28,7 @@ export type Database = {
           status: Database["public"]["Enums"]["book_status"]
           title: string | null
           updated_at: string
+          user_id: string | null
         }
         Insert: {
           animal: string
@@ -42,6 +43,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["book_status"]
           title?: string | null
           updated_at?: string
+          user_id?: string | null
         }
         Update: {
           animal?: string
@@ -56,6 +58,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["book_status"]
           title?: string | null
           updated_at?: string
+          user_id?: string | null
         }
         Relationships: []
       }
