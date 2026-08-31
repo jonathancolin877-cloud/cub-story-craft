@@ -343,7 +343,7 @@ function Studio() {
 
             <Button
               onClick={onGenerate}
-              disabled={loading}
+              disabled={loading || book2Blocked}
               className="w-full rounded-2xl py-6 text-base font-extrabold"
             >
               {loading ? (
@@ -357,9 +357,33 @@ function Studio() {
               )}
             </Button>
 
+            <div className="rounded-2xl border border-border bg-secondary p-3 text-xs leading-relaxed text-secondary-foreground">
+              <strong>Book 2 gate:</strong> Book 1 is code-live, not product-live. New books stay
+              locked until Book 1&apos;s PDF passes the Amazon KDP validator.
+              <label className="mt-2 flex cursor-pointer items-start gap-2 font-semibold">
+                <input
+                  type="checkbox"
+                  className="mt-0.5 cursor-pointer"
+                  checked={kdpValidated}
+                  onChange={(e) => {
+                    setKdpValidated(e.target.checked);
+                    try {
+                      localStorage.setItem(KDP_VALIDATED_KEY, e.target.checked ? "1" : "0");
+                    } catch {
+                      /* ignore */
+                    }
+                  }}
+                />
+                Book 1 PDF passed the KDP validator (unlocks Book 2)
+              </label>
+            </div>
+
             <p className="rounded-2xl bg-secondary p-3 text-xs leading-relaxed text-secondary-foreground">
-              <strong>Character consistency prompt:</strong> {STYLE_BASE}
+              <strong>Illustration spec (locked):</strong> 1:1 square, min{" "}
+              {PRINT_SPEC.minPx}px, upscaled to {PRINT_SPEC.printPx}×{PRINT_SPEC.printPx} for 300
+              DPI, {PRINT_SPEC.bleedIn}in bleed. {STYLE_BASE}
             </p>
+
           </div>
         </section>
 
