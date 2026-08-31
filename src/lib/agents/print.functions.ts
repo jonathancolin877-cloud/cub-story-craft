@@ -28,8 +28,9 @@ const FONT_URLS = {
     "https://cdn.jsdelivr.net/gh/googlefonts/noto-fonts@main/hinted/ttf/NotoSans/NotoSans-Regular.ttf",
   latinBold:
     "https://cdn.jsdelivr.net/gh/googlefonts/noto-fonts@main/hinted/ttf/NotoSans/NotoSans-Bold.ttf",
-  devanagari:
-    "https://cdn.jsdelivr.net/gh/googlefonts/noto-fonts@main/hinted/ttf/NotoSansDevanagari/NotoSansDevanagari-Regular.ttf",
+  // Mukta (Ek Type) shapes cleanly with fontkit; Noto Devanagari trips a
+  // fontkit GPOS mark-anchor bug in this runtime.
+  devanagari: "https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/mukta/Mukta-Regular.ttf",
 } as const;
 
 const fontCache = new Map<string, ArrayBuffer>();
