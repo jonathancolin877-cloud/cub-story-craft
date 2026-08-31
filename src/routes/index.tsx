@@ -398,10 +398,11 @@ function Studio() {
             </div>
 
             <p className="rounded-2xl bg-secondary p-3 text-xs leading-relaxed text-secondary-foreground">
-              <strong>Illustration spec (locked):</strong> 1:1 square, min{" "}
-              {PRINT_SPEC.minPx}px, upscaled to {PRINT_SPEC.printPx}×{PRINT_SPEC.printPx} for 300
-              DPI, {PRINT_SPEC.bleedIn}in bleed. {STYLE_BASE}
+              <strong>Illustration spec (locked):</strong> 1:1 square, upscaled to{" "}
+              {PRINT_SPEC.printPx}×{PRINT_SPEC.printPx} for 300 DPI, {PRINT_SPEC.bleedIn}in bleed,{" "}
+              {PRINT_SPEC.safeMarginIn}in safe margin. {STYLE_BASE}
             </p>
+
 
           </div>
         </section>
