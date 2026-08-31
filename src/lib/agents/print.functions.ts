@@ -286,7 +286,7 @@ export const buildPrintPdf = createServerFn({ method: "POST" })
     cover.drawRectangle({ x: 0, y: 0, width: PAGE_PT, height: 158, color: rgb(1, 1, 1) });
     let y = drawCentered(cover, wrap(data.title, latinBold, 26, SAFE_W), latinBold, 26, 110, INK);
     if (data.titleTranslated.trim()) {
-      y = drawCentered(cover, wrap(data.titleTranslated, deva, 18, SAFE_W), deva, 18, y - 4, INK);
+      y = drawCenteredDeva(cover, data.titleTranslated, 18, y - 4, INK);
     }
     drawCentered(
       cover,
@@ -305,7 +305,7 @@ export const buildPrintPdf = createServerFn({ method: "POST" })
       let ty = PAGE_PT - SAFE_PT - IMG - 30;
       ty = drawCentered(page, wrap(p.en, latinBold, 16, SAFE_W), latinBold, 16, ty, INK);
       if (p.translated.trim()) {
-        ty = drawCentered(page, wrap(p.translated, deva, 14, SAFE_W), deva, 14, ty - 4, AMBER);
+        ty = drawCenteredDeva(page, p.translated, 14, ty - 4, AMBER);
       }
       const factLines = wrap(`Did you know? ${p.fact}`, latin, 9.5, SAFE_W - 24);
       const boxH = factLines.length * 13 + 20;
