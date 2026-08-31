@@ -127,7 +127,12 @@ function Studio() {
   }, [book]);
 
   async function onGenerate() {
+    if (book2Blocked) {
+      toast.error("Book 2 is locked until Book 1's PDF passes the KDP validator.");
+      return;
+    }
     setLoading(true);
+
     setBook(null);
     setImgProgress(null);
     try {
