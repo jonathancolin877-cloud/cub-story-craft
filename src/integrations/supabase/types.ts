@@ -17,6 +17,7 @@ export type Database = {
       books: {
         Row: {
           animal: string
+          book_number: number | null
           created_at: string
           id: string
           images: Json
@@ -24,11 +25,13 @@ export type Database = {
           pages: Json
           region: string
           saved: boolean
+          status: Database["public"]["Enums"]["book_status"]
           title: string | null
           updated_at: string
         }
         Insert: {
           animal: string
+          book_number?: number | null
           created_at?: string
           id?: string
           images?: Json
@@ -36,11 +39,13 @@ export type Database = {
           pages?: Json
           region: string
           saved?: boolean
+          status?: Database["public"]["Enums"]["book_status"]
           title?: string | null
           updated_at?: string
         }
         Update: {
           animal?: string
+          book_number?: number | null
           created_at?: string
           id?: string
           images?: Json
@@ -48,6 +53,7 @@ export type Database = {
           pages?: Json
           region?: string
           saved?: boolean
+          status?: Database["public"]["Enums"]["book_status"]
           title?: string | null
           updated_at?: string
         }
@@ -61,7 +67,7 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      book_status: "draft" | "in_production" | "live"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -188,6 +194,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      book_status: ["draft", "in_production", "live"],
+    },
   },
 } as const
