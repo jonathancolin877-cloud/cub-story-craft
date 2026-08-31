@@ -66,7 +66,7 @@ async function scriptLineImage(
   };
 }
 
-/** Upscale a square illustration to the 300 DPI print size (2550x2550). */
+/** Upscale a square illustration to the 300 DPI print size (2625x2625, 8.75in incl. bleed). */
 async function upscaleSquare(src: string, px = PRINT_SPEC.printPx): Promise<string> {
   try {
     const img = new Image();
