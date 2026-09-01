@@ -10,8 +10,12 @@ import { kdpValidatorAgent, type KdpReport } from "@/lib/agents/kdp-validator-ag
 import type { Book } from "@/lib/book-types";
 
 export const agents = {
-  illustrate: (input: { scene: string; characterBible?: string; characterSheet?: string }) =>
-    illustratorAgent({ data: input }),
+  illustrate: (input: {
+    scene: string;
+    characterBible?: string;
+    characterSheet?: string;
+    bookId?: string;
+  }) => illustratorAgent({ data: input }),
   layout: (book: Book, onProgress?: (done: number, total: number) => void) =>
     layoutAgent(book, onProgress),
   validate: (book: Book, layout?: LayoutResult): Promise<KdpReport> =>

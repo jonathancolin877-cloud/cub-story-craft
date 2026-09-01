@@ -91,7 +91,7 @@ function LibraryPage() {
                       <img
                         src={entry.book.coverImage}
                         alt={`Cover illustration for ${entry.book.title}`}
-                        className="h-full w-full object-cover"
+                        className="h-full w-full object-contain"
                         loading="lazy"
                       />
                     ) : (
