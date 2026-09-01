@@ -7,8 +7,12 @@ import { z } from "zod";
  * 2625x2625 (8.75in incl. 0.125in bleed @ 300 DPI). Character bible is locked.
  */
 
-/** Only square size the image gateway accepts; the client upscales to 2625. */
-const GATEWAY_SQUARE_PX = 1_024;
+/**
+ * Squares we try, largest first. The gateway currently caps squares at 1024,
+ * but if a bigger square becomes available this picks it up automatically.
+ */
+const SQUARE_CANDIDATES = [2048, 1536, 1024] as const;
+
 
 export const SHERU_CHARACTER_BIBLE =
   "Cute baby tiger cub Sheru, orange with black stripes, white belly, pink nose, small rounded ears, big amber eyes, same proportions every page, Pixar storybook 2D, soft colors, lush Indian jungle background, no text in image";
