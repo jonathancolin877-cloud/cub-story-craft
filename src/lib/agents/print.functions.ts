@@ -314,27 +314,58 @@ export const buildPrintPdf = createServerFn({ method: "POST" })
         return await doc.save({ useObjectStreams: false });
       };
 
-      return { doc, latin, latinBold, newPage, drawImage, drawCentered, drawCenteredDeva, wrap, finish };
+      return {
+        doc,
+        latin,
+        latinBold,
+        poppins,
+        poppinsBold,
+        newPage,
+        drawImage,
+        drawCentered,
+        drawCenteredDeva,
+        wrap,
+        finish,
+      };
     }
 
-    // ---- Cover file (full-bleed square, cover only) ----
-    const c = await makeDoc();
+    // ---- Cover file (white panel layout, cover only) ----
+    const c = await makeDoc({ devanagariUrl: FONT_URLS.baloo, display: true });
     const cover = c.newPage();
-    await c.drawImage(cover, data.coverPath, 0, 0, PAGE_PT);
-    cover.drawRectangle({ x: 0, y: 0, width: PAGE_PT, height: 158, color: rgb(1, 1, 1) });
-    let cy = c.drawCentered(cover, c.wrap(data.title, c.latinBold, 26, SAFE_W), c.latinBold, 26, 110, INK);
+    cover.drawRectangle({ x: 0, y: 0, width: PAGE_PT, height: PAGE_PT, color: rgb(1, 1, 1) });
+
+    // Panel drawn at exactly nativePx / 300 inches -> a true 300 DPI placement.
+    const nativePx = data.coverNativePx && data.coverNativePx > 0 ? data.coverNativePx : 1024;
+    const panelPt = Math.min((nativePx / 300) * PT, SAFE_W);
+    const panelX = (PAGE_PT - panelPt) / 2;
+    const panelY = (PAGE_PT - panelPt) / 2 - 12;
+    cover.drawRectangle({
+      x: panelX - 6,
+      y: panelY - 6,
+      width: panelPt + 12,
+      height: panelPt + 12,
+      color: rgb(0.988, 0.965, 0.906),
+      borderColor: rgb(0.85, 0.76, 0.53),
+      borderWidth: 1.2,
+    });
+    await c.drawImage(cover, data.coverPath, panelX, panelY, panelPt);
+
+    const titleLines = c.wrap(data.title, c.poppinsBold, 30, SAFE_W);
+    const titleTop = panelY + panelPt + 30 + (titleLines.length - 1) * 30 * 1.35;
+    c.drawCentered(cover, titleLines, c.poppinsBold, 30, titleTop, INK);
     if (data.titleTranslated.trim()) {
-      cy = c.drawCenteredDeva(cover, data.titleTranslated, 18, cy - 4, INK);
+      c.drawCenteredDeva(cover, data.titleTranslated, 20, panelY - 44, INK);
     }
     c.drawCentered(
       cover,
       ["Mawil Kids Global Factory - Little Zoologists of the World"],
-      c.latin,
+      c.poppins,
       10,
-      30,
+      SAFE_PT + 6,
       INK,
     );
     const coverBytes = await c.finish();
+
 
     // ---- Interior file (story pages only, no cover) ----
     const it = await makeDoc();
