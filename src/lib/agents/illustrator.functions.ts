@@ -94,7 +94,7 @@ export const illustratorAgent = createServerFn({ method: "POST" })
 
     for (const px of SQUARE_CANDIDATES) {
       // Two attempts per size: with seed (if we have one), then without.
-      const attempts: boolean[] = seed !== undefined ? [true, false] : [false];
+      const attempts: boolean[] = seed !== undefined && !seedError ? [true, false] : [false];
       let sizeRejected = false;
 
       for (const withSeed of attempts) {
