@@ -441,17 +441,8 @@ export const buildPrintPdf = createServerFn({ method: "POST" })
 
     void PDFString;
 
-    const put = async (name: string, bytes: Uint8Array) => {
-      const path = `${context.userId}/${data.jobId}/${name}`;
-      const up = await bucket.upload(path, bytes, {
-        contentType: "application/pdf",
-        upsert: true,
-      });
-      if (up.error) throw new Error(`Could not store PDF: ${up.error.message}`);
-      const signed = await bucket.createSignedUrl(path, 60 * 60);
-      if (signed.error || !signed.data) throw new Error("Could not sign PDF url");
-      return { path, url: signed.data.signedUrl, bytes: bytes.length };
-    };
+
+
 
     const interior = await put("book-kdp-interior-8.5x8.5.pdf", interiorBytes);
     const coverFile = await put("book-kdp-cover-8.5x8.5.pdf", coverBytes);
