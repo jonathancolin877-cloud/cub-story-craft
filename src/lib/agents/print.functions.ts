@@ -370,10 +370,34 @@ export const buildPrintPdf = createServerFn({ method: "POST" })
     );
     const coverBytes = await c.finish();
 
+    const put = async (name: string, bytes: Uint8Array) => {
+      const path = `${context.userId}/${data.jobId}/${name}`;
+      const up = await bucket.upload(path, bytes, {
+        contentType: "application/pdf",
+        upsert: true,
+      });
+      if (up.error) throw new Error(`Could not store PDF: ${up.error.message}`);
+      const signed = await bucket.createSignedUrl(path, 60 * 60);
+      if (signed.error || !signed.data) throw new Error("Could not sign PDF url");
+      return { path, url: signed.data.signedUrl, bytes: bytes.length };
+    };
+
+    // Cover-only rebuild: leaves any existing interior PDF completely untouched.
+    if (data.coverOnly) {
+      const only = await put("book-kdp-cover-8.5x8.5.pdf", coverBytes);
+      return {
+        interior: null,
+        cover: { ...only, pageCount: c.doc.getPageCount() },
+        embeddedImages,
+        smallestImagePx: Number.isFinite(smallestImagePx) ? smallestImagePx : 0,
+        trueSourcePx: data.trueSourcePx ?? 0,
+      };
+    }
 
     // ---- Interior file (story pages only, no cover) ----
     const it = await makeDoc();
     const IMG = INTERIOR_IMG_IN * PT; // 396pt square, never cropped
+
     for (const p of data.pages) {
       const page = it.newPage();
       await it.drawImage(page, p.path, (PAGE_PT - IMG) / 2, PAGE_PT - SAFE_PT - IMG, IMG);
