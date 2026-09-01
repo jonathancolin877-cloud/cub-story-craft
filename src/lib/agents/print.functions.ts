@@ -498,6 +498,13 @@ export const validatePrintPdf = createServerFn({ method: "POST" })
     );
     const imgMin = widths.length ? Math.min(...widths) : 0;
     const trueSrc = data.trueSourcePx ?? 0;
+    // Effective DPI = embedded pixels / drawn size in inches.
+    const interiorDpi = imgMin ? imgMin / INTERIOR_IMG_IN : 0;
+    const coverDrawnIn = Math.min(
+      (data.coverNativePx || coverImgPx || 1024) / 300,
+      SAFE_W / PT,
+    );
+    const coverDpi = coverImgPx && coverDrawnIn ? coverImgPx / coverDrawnIn : 0;
 
     const boxOk = pages.every((p) => {
       const media = p.getSize();
