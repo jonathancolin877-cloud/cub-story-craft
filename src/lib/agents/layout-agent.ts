@@ -29,6 +29,7 @@ export type LayoutResult = {
     safeMarginIn: number;
     imagePx: number;
     trueSourcePx: number;
+    coverNativePx: number;
   };
 };
 
@@ -37,29 +38,41 @@ const slug = (s: string) =>
 
 /** True generated pixel size of an illustration, before any upscale. */
 let smallestTrueSourcePx = Infinity;
+/** True native pixel size of the cover art (uploaded without upscaling). */
+let coverNativePx = 0;
 
-/** Upscale a 1:1 illustration to the exact 300 DPI print size and return a JPEG blob. */
-async function printJpeg(src: string, px = PRINT_SPEC.printPx): Promise<Blob | null> {
+/**
+ * Encode a 1:1 illustration as JPEG.
+ * `px = 0` keeps the NATIVE generated size (used for the cover panel, which is
+ * drawn at nativePx/300 inches so it is a true 300 DPI placement).
+ */
+async function printJpeg(
+  src: string,
+  px: number = PRINT_SPEC.printPx,
+): Promise<{ blob: Blob; px: number } | null> {
   const img = new Image();
   img.crossOrigin = "anonymous";
   img.src = src;
   await img.decode();
-  smallestTrueSourcePx = Math.min(
-    smallestTrueSourcePx,
-    Math.min(img.naturalWidth, img.naturalHeight),
-  );
+  const nativePx = Math.min(img.naturalWidth, img.naturalHeight);
+  smallestTrueSourcePx = Math.min(smallestTrueSourcePx, nativePx);
+  const out = px || nativePx;
   const canvas = document.createElement("canvas");
-  canvas.width = px;
-  canvas.height = px;
+  canvas.width = out;
+  canvas.height = out;
   const ctx = canvas.getContext("2d");
   if (!ctx) return null;
   ctx.fillStyle = "#ffffff";
-  ctx.fillRect(0, 0, px, px);
+  ctx.fillRect(0, 0, out, out);
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = "high";
-  ctx.drawImage(img, 0, 0, px, px); // source is square - pure upscale, never a crop
-  return await new Promise((resolve) => canvas.toBlob((b) => resolve(b), "image/jpeg", 0.9));
+  ctx.drawImage(img, 0, 0, out, out); // source is square - pure upscale, never a crop
+  const blob = await new Promise<Blob | null>((resolve) =>
+    canvas.toBlob((b) => resolve(b), "image/jpeg", px ? 0.9 : 0.92),
+  );
+  return blob ? { blob, px: out } : null;
 }
+
 
 
 export async function layoutAgent(
@@ -71,36 +84,41 @@ export async function layoutAgent(
   if (!uid) throw new Error("Sign in to build the print-ready PDF");
 
   smallestTrueSourcePx = Infinity;
+  coverNativePx = 0;
   const jobId = `${slug(book.title)}-${Date.now()}`;
   const bucket = supabase.storage.from("print-assets");
   const total = book.pages.length + 1;
   let done = 0;
 
-  const upload = async (src: string | undefined, name: string) => {
+  const upload = async (src: string | undefined, name: string, px: number = PRINT_SPEC.printPx) => {
     done++;
     onProgress?.(done, total);
     if (!src) return undefined;
-    const blob = await printJpeg(src);
-    if (!blob) return undefined;
+    const encoded = await printJpeg(src, px);
+    if (!encoded) return undefined;
     const path = `${uid}/${jobId}/${name}.jpg`;
-    const { error } = await bucket.upload(path, blob, {
+    const { error } = await bucket.upload(path, encoded.blob, {
       contentType: "image/jpeg",
       upsert: true,
     });
     if (error) throw new Error(`Upload failed: ${error.message}`);
-    return path;
+    return { path, px: encoded.px };
   };
 
-  const coverPath = await upload(book.coverImage, "cover");
+  // Cover ships at its NATIVE generated size (no upscale) so the panel layout
+  // can place it at exactly nativePx / 300 inches = true 300 DPI.
+  const coverUp = await upload(book.coverImage, "cover", 0);
+  const coverPath = coverUp?.path;
+  coverNativePx = coverUp?.px ?? 0;
   const pages: { page: number; en: string; translated: string; fact: string; path?: string }[] = [];
   for (const p of book.pages) {
-    const path = await upload(p.image, `p${String(p.page).padStart(2, "0")}`);
+    const up = await upload(p.image, `p${String(p.page).padStart(2, "0")}`);
     pages.push({
       page: p.page,
       en: p.en,
       translated: p.translated,
       fact: p.fact,
-      ...(path ? { path } : {}),
+      ...(up ? { path: up.path } : {}),
     });
   }
 
@@ -113,9 +131,11 @@ export async function layoutAgent(
       titleTranslated: book.titleTranslated,
       ...(coverPath ? { coverPath } : {}),
       trueSourcePx,
+      coverNativePx,
       pages,
     },
   });
+
 
   const base = slug(book.title);
   const file = (
@@ -133,10 +153,11 @@ export async function layoutAgent(
     },
   });
 
+  const interior = result.interior!;
   return {
-    interior: file(result.interior, `${base}-kdp-interior-8.5x8.5.pdf`),
+    interior: file(interior, `${base}-kdp-interior-8.5x8.5.pdf`),
     cover: file(result.cover, `${base}-kdp-cover-8.5x8.5.pdf`),
-    path: result.interior.path,
+    path: interior.path,
     meta: {
       pageSizeIn: PRINT_SPEC.trimIn + PRINT_SPEC.bleedIn * 2,
       trimIn: PRINT_SPEC.trimIn,
@@ -144,7 +165,41 @@ export async function layoutAgent(
       safeMarginIn: PRINT_SPEC.safeMarginIn,
       imagePx: PRINT_SPEC.printPx,
       trueSourcePx,
+      coverNativePx,
     },
   };
 }
+
+/**
+ * Rebuild ONLY the cover PDF (native-resolution panel layout) into an existing
+ * job folder. The interior PDF in that folder is never read or rewritten.
+ */
+export async function rebuildCover(book: Book, jobId: string) {
+  const { data: sessionData } = await supabase.auth.getSession();
+  const uid = sessionData.session?.user.id;
+  if (!uid) throw new Error("Sign in to build the print-ready PDF");
+  if (!book.coverImage) throw new Error("This book has no cover illustration");
+
+  const encoded = await printJpeg(book.coverImage, 0);
+  if (!encoded) throw new Error("Could not encode the cover illustration");
+  const coverPath = `${uid}/${jobId}/cover-native.jpg`;
+  const { error } = await supabase.storage
+    .from("print-assets")
+    .upload(coverPath, encoded.blob, { contentType: "image/jpeg", upsert: true });
+  if (error) throw new Error(`Upload failed: ${error.message}`);
+
+  const result = await buildPrintPdf({
+    data: {
+      jobId,
+      title: book.title,
+      titleTranslated: book.titleTranslated,
+      coverPath,
+      coverNativePx: encoded.px,
+      coverOnly: true,
+      pages: [{ page: 1, en: "", translated: "", fact: "" }],
+    },
+  });
+  return { cover: result.cover, coverNativePx: encoded.px };
+}
+
 

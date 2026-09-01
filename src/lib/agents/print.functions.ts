@@ -26,6 +26,8 @@ const SAFE_PT = (BLEED_IN + MARGIN_IN) * PT; // 45
 const SAFE_W = PAGE_PT - SAFE_PT * 2; // 540
 /** Print sizing target (upscaled). */
 export const REQUIRED_IMAGE_PX = 2625;
+/** Interior illustrations are drawn as a 5.5in square. */
+const INTERIOR_IMG_IN = 5.5;
 /** Honest minimum for TRUE generated pixels before upscaling. */
 export const REQUIRED_TRUE_SOURCE_PX = 2048;
 
@@ -37,7 +39,12 @@ const FONT_URLS = {
   // Mukta (Ek Type) shapes cleanly with fontkit; Noto Devanagari trips a
   // fontkit GPOS mark-anchor bug in this runtime.
   devanagari: "https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/mukta/Mukta-Regular.ttf",
+  // Cover-only display faces.
+  poppins: "https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/poppins/Poppins-Regular.ttf",
+  poppinsBold: "https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/poppins/Poppins-Bold.ttf",
+  baloo: "https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/baloo2/Baloo2%5Bwght%5D.ttf",
 } as const;
+
 
 const fontCache = new Map<string, ArrayBuffer>();
 async function loadFont(url: string) {
@@ -83,6 +90,10 @@ const Input = z.object({
   coverPath: z.string().optional(),
   /** True generated pixel size of the illustrations before any upscale. */
   trueSourcePx: z.number().optional(),
+  /** True native pixel size of the cover image as uploaded (no upscale). */
+  coverNativePx: z.number().optional(),
+  /** Rebuild only the cover PDF, leaving any existing interior file untouched. */
+  coverOnly: z.boolean().optional(),
   pages: z.array(PageInput).min(1),
 });
 
@@ -133,17 +144,17 @@ export const buildPrintPdf = createServerFn({ method: "POST" })
 
     const latinBytes = await loadFont(FONT_URLS.latin);
     const latinBoldBytes = await loadFont(FONT_URLS.latinBold);
-    const devaBytes = await loadFont(FONT_URLS.devanagari);
-    const shaper = fontkit.create(new Uint8Array(devaBytes));
-    const emScale = (size: number) => size / shaper.unitsPerEm;
-    const measureDeva = (text: string, size: number) =>
-      shaper.layout(text).advanceWidth * emScale(size);
 
     let smallestImagePx = Infinity;
     let embeddedImages = 0;
 
     /** One fully-configured document with the same fonts + helpers. */
-    async function makeDoc() {
+    async function makeDoc(opts: { devanagariUrl?: string; display?: boolean } = {}) {
+      const devaBytes = await loadFont(opts.devanagariUrl ?? FONT_URLS.devanagari);
+      const shaper = fontkit.create(new Uint8Array(devaBytes));
+      const emScale = (size: number) => size / shaper.unitsPerEm;
+      const measureDeva = (text: string, size: number) =>
+        shaper.layout(text).advanceWidth * emScale(size);
       const doc = await PDFDocument.create();
       doc.registerFontkit(
         fontkit as unknown as Parameters<(typeof doc)["registerFontkit"]>[0],
@@ -152,6 +163,13 @@ export const buildPrintPdf = createServerFn({ method: "POST" })
       const latin = await doc.embedFont(latinBytes, { subset: false });
       const latinBold = await doc.embedFont(latinBoldBytes, { subset: false });
       const deva = await doc.embedFont(devaBytes, { subset: false });
+      const poppins = opts.display
+        ? await doc.embedFont(await loadFont(FONT_URLS.poppins), { subset: false })
+        : latin;
+      const poppinsBold = opts.display
+        ? await doc.embedFont(await loadFont(FONT_URLS.poppinsBold), { subset: false })
+        : latinBold;
+
 
       // Devanagari needs full GSUB/GPOS shaping (matra reordering + mark
       // attachment), so glyphs are positioned individually instead of relying
@@ -302,31 +320,86 @@ export const buildPrintPdf = createServerFn({ method: "POST" })
         return await doc.save({ useObjectStreams: false });
       };
 
-      return { doc, latin, latinBold, newPage, drawImage, drawCentered, drawCenteredDeva, wrap, finish };
+      return {
+        doc,
+        latin,
+        latinBold,
+        poppins,
+        poppinsBold,
+        newPage,
+        drawImage,
+        drawCentered,
+        drawCenteredDeva,
+        wrap,
+        finish,
+      };
     }
 
-    // ---- Cover file (full-bleed square, cover only) ----
-    const c = await makeDoc();
+    // ---- Cover file (white panel layout, cover only) ----
+    const c = await makeDoc({ devanagariUrl: FONT_URLS.baloo, display: true });
     const cover = c.newPage();
-    await c.drawImage(cover, data.coverPath, 0, 0, PAGE_PT);
-    cover.drawRectangle({ x: 0, y: 0, width: PAGE_PT, height: 158, color: rgb(1, 1, 1) });
-    let cy = c.drawCentered(cover, c.wrap(data.title, c.latinBold, 26, SAFE_W), c.latinBold, 26, 110, INK);
+    cover.drawRectangle({ x: 0, y: 0, width: PAGE_PT, height: PAGE_PT, color: rgb(1, 1, 1) });
+
+    // Panel drawn at exactly nativePx / 300 inches -> a true 300 DPI placement.
+    const nativePx = data.coverNativePx && data.coverNativePx > 0 ? data.coverNativePx : 1024;
+    const panelPt = Math.min((nativePx / 300) * PT, SAFE_W);
+    const panelX = (PAGE_PT - panelPt) / 2;
+    const panelY = (PAGE_PT - panelPt) / 2 - 12;
+    cover.drawRectangle({
+      x: panelX - 6,
+      y: panelY - 6,
+      width: panelPt + 12,
+      height: panelPt + 12,
+      color: rgb(0.988, 0.965, 0.906),
+      borderColor: rgb(0.85, 0.76, 0.53),
+      borderWidth: 1.2,
+    });
+    await c.drawImage(cover, data.coverPath, panelX, panelY, panelPt);
+
+    const titleLines = c.wrap(data.title, c.poppinsBold, 30, SAFE_W);
+    const titleTop = panelY + panelPt + 30 + (titleLines.length - 1) * 30 * 1.35;
+    c.drawCentered(cover, titleLines, c.poppinsBold, 30, titleTop, INK);
     if (data.titleTranslated.trim()) {
-      cy = c.drawCenteredDeva(cover, data.titleTranslated, 18, cy - 4, INK);
+      c.drawCenteredDeva(cover, data.titleTranslated, 20, panelY - 44, INK);
     }
     c.drawCentered(
       cover,
       ["Mawil Kids Global Factory - Little Zoologists of the World"],
-      c.latin,
+      c.poppins,
       10,
-      30,
+      SAFE_PT + 6,
       INK,
     );
     const coverBytes = await c.finish();
 
+    const put = async (name: string, bytes: Uint8Array) => {
+      const path = `${context.userId}/${data.jobId}/${name}`;
+      const up = await bucket.upload(path, bytes, {
+        contentType: "application/pdf",
+        upsert: true,
+      });
+      if (up.error) throw new Error(`Could not store PDF: ${up.error.message}`);
+      const signed = await bucket.createSignedUrl(path, 60 * 60);
+      if (signed.error || !signed.data) throw new Error("Could not sign PDF url");
+      return { path, url: signed.data.signedUrl, bytes: bytes.length };
+    };
+
+    // Cover-only rebuild: leaves any existing interior PDF completely untouched.
+    if (data.coverOnly) {
+      const only = await put("book-kdp-cover-8.5x8.5.pdf", coverBytes);
+      return {
+        interior: null,
+        cover: { ...only, pageCount: c.doc.getPageCount() },
+        embeddedImages,
+        smallestImagePx: Number.isFinite(smallestImagePx) ? smallestImagePx : 0,
+        trueSourcePx: data.trueSourcePx ?? 0,
+      };
+    }
+
     // ---- Interior file (story pages only, no cover) ----
     const it = await makeDoc();
-    const IMG = 5.5 * PT; // 396pt square, never cropped
+    const IMG = INTERIOR_IMG_IN * PT; // 396pt square, never cropped
+
     for (const p of data.pages) {
       const page = it.newPage();
       await it.drawImage(page, p.path, (PAGE_PT - IMG) / 2, PAGE_PT - SAFE_PT - IMG, IMG);
@@ -370,17 +443,8 @@ export const buildPrintPdf = createServerFn({ method: "POST" })
 
     void PDFString;
 
-    const put = async (name: string, bytes: Uint8Array) => {
-      const path = `${context.userId}/${data.jobId}/${name}`;
-      const up = await bucket.upload(path, bytes, {
-        contentType: "application/pdf",
-        upsert: true,
-      });
-      if (up.error) throw new Error(`Could not store PDF: ${up.error.message}`);
-      const signed = await bucket.createSignedUrl(path, 60 * 60);
-      if (signed.error || !signed.data) throw new Error("Could not sign PDF url");
-      return { path, url: signed.data.signedUrl, bytes: bytes.length };
-    };
+
+
 
     const interior = await put("book-kdp-interior-8.5x8.5.pdf", interiorBytes);
     const coverFile = await put("book-kdp-cover-8.5x8.5.pdf", coverBytes);
@@ -412,6 +476,7 @@ export const validatePrintPdf = createServerFn({ method: "POST" })
         path: z.string().min(3),
         coverPath: z.string().optional(),
         trueSourcePx: z.number().optional(),
+        coverNativePx: z.number().optional(),
       })
       .parse(d),
   )
@@ -428,15 +493,23 @@ export const validatePrintPdf = createServerFn({ method: "POST" })
     const pages = doc.getPages();
 
     let coverPages = 0;
+    let coverImgPx = 0;
     if (data.coverPath) {
       const cdl = await store.download(data.coverPath);
       if (!cdl.error && cdl.data) {
-        const cdoc = await PDFDocument.load(new Uint8Array(await cdl.data.arrayBuffer()), {
+        const cbytes = new Uint8Array(await cdl.data.arrayBuffer());
+        const cdoc = await PDFDocument.load(cbytes, {
           updateMetadata: false,
         });
         coverPages = cdoc.getPageCount();
+        const craw = new TextDecoder("latin1").decode(cbytes);
+        const cw = [...craw.matchAll(/\/Subtype\s*\/Image[\s\S]{0,400}?\/Width\s+(\d+)/g)].map((m) =>
+          Number(m[1]),
+        );
+        coverImgPx = cw.length ? Math.min(...cw) : 0;
       }
     }
+
 
     const count = (re: RegExp) => (raw.match(re) ?? []).length;
     const widths = [...raw.matchAll(/\/Subtype\s*\/Image[\s\S]{0,400}?\/Width\s+(\d+)/g)].map((m) =>
@@ -444,6 +517,13 @@ export const validatePrintPdf = createServerFn({ method: "POST" })
     );
     const imgMin = widths.length ? Math.min(...widths) : 0;
     const trueSrc = data.trueSourcePx ?? 0;
+    // Effective DPI = embedded pixels / drawn size in inches.
+    const interiorDpi = imgMin ? imgMin / INTERIOR_IMG_IN : 0;
+    const coverDrawnIn = Math.min(
+      (data.coverNativePx || coverImgPx || 1024) / 300,
+      SAFE_W / PT,
+    );
+    const coverDpi = coverImgPx && coverDrawnIn ? coverImgPx / coverDrawnIn : 0;
 
     const boxOk = pages.every((p) => {
       const media = p.getSize();
@@ -475,13 +555,17 @@ export const validatePrintPdf = createServerFn({ method: "POST" })
       },
       {
         id: "embedded-px",
-        label: `Embedded image size >= ${REQUIRED_IMAGE_PX}px (print sizing)`,
-        pass: widths.length > 0 && imgMin >= REQUIRED_IMAGE_PX,
+        label: "Effective image resolution >= 300 DPI (as drawn)",
+        pass: widths.length > 0 && interiorDpi >= 300 && (!coverImgPx || coverDpi >= 300),
         detail: widths.length
-          ? `${widths.length} image(s) in the interior, smallest ${imgMin}px (upscaled from ${trueSrc || "unknown"}px)`
+          ? `interior art ${imgMin}px drawn at ${INTERIOR_IMG_IN}in = ${Math.round(interiorDpi)} DPI (upscaled from ${trueSrc || "unknown"}px); ` +
+            (coverImgPx
+              ? `cover art ${coverImgPx}px drawn at ${coverDrawnIn.toFixed(2)}in = ${Math.round(coverDpi)} DPI (native, not upscaled)`
+              : "cover file not checked")
           : "No images embedded",
         severity: "error",
       },
+
       {
         id: "colour-space",
         label: "Colour space: DeviceRGB (no PDF/X-1a claim)",
