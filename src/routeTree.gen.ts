@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthRouteImport } from './routes/auth'
+import { Route as DevWrapRouteImport } from './routes/dev-wrap'
 import { Route as LandingRouteImport } from './routes/landing'
 import { Route as LibraryRouteImport } from './routes/library'
 
@@ -22,6 +23,11 @@ const IndexRoute = IndexRouteImport.update({
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
   path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DevWrapRoute = DevWrapRouteImport.update({
+  id: '/dev-wrap',
+  path: '/dev-wrap',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LandingRoute = LandingRouteImport.update({
@@ -38,12 +44,14 @@ const LibraryRoute = LibraryRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/dev-wrap': typeof DevWrapRoute
   '/landing': typeof LandingRoute
   '/library': typeof LibraryRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/dev-wrap': typeof DevWrapRoute
   '/landing': typeof LandingRoute
   '/library': typeof LibraryRoute
 }
@@ -51,20 +59,22 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/dev-wrap': typeof DevWrapRoute
   '/landing': typeof LandingRoute
   '/library': typeof LibraryRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/auth' | '/landing' | '/library'
+  fullPaths: '/' | '/auth' | '/dev-wrap' | '/landing' | '/library'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/auth' | '/landing' | '/library'
-  id: '__root__' | '/' | '/auth' | '/landing' | '/library'
+  to: '/' | '/auth' | '/dev-wrap' | '/landing' | '/library'
+  id: '__root__' | '/' | '/auth' | '/dev-wrap' | '/landing' | '/library'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthRoute: typeof AuthRoute
+  DevWrapRoute: typeof DevWrapRoute
   LandingRoute: typeof LandingRoute
   LibraryRoute: typeof LibraryRoute
 }
@@ -83,6 +93,13 @@ declare module '@tanstack/react-router' {
       path: '/auth'
       fullPath: '/auth'
       preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dev-wrap': {
+      id: '/dev-wrap'
+      path: '/dev-wrap'
+      fullPath: '/dev-wrap'
+      preLoaderRoute: typeof DevWrapRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/landing': {
@@ -105,6 +122,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthRoute: AuthRoute,
+  DevWrapRoute: DevWrapRoute,
   LandingRoute: LandingRoute,
   LibraryRoute: LibraryRoute,
 }

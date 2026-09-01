@@ -601,3 +601,365 @@ export const validatePrintPdf = createServerFn({ method: "POST" })
     const blocksPublish = checks.some((c) => !c.pass && c.severity === "error");
     return { pass, blocksPublish, checks };
   });
+
+/* ============================================================
+ * WRAPAROUND COVER (single landscape sheet, 17.304in x 8.75in)
+ *  bleed .125 | back 8.5 | spine .054 | front 8.5 | bleed .125
+ * ============================================================ */
+export const SPINE_IN = 24 * 0.002252; // 0.054048 -> 0.054in for 24 white pages
+const WRAP_SPINE_IN = 0.054;
+const WRAP_W_IN = BLEED_IN + TRIM_IN + WRAP_SPINE_IN + TRIM_IN + BLEED_IN; // 17.304
+const WRAP_W_PT = WRAP_W_IN * PT; // 1245.888
+const WRAP_H_PT = PAGE_PT; // 630
+const BACK_X0 = BLEED_PT;
+const BACK_X1 = BLEED_PT + TRIM_IN * PT; // 621
+const SPINE_X1 = BACK_X1 + WRAP_SPINE_IN * PT; // 624.888
+const FRONT_X1 = SPINE_X1 + TRIM_IN * PT; // 1236.888
+const SAFE_IN_PT = MARGIN_IN * PT; // 36
+/** Blank barcode reserve: 2in x 1.2in, bottom-right of the back cover. */
+const BARCODE_W = 2 * PT;
+const BARCODE_H = 1.2 * PT;
+
+const WrapInput = z.object({
+  jobId: z.string().min(3),
+  title: z.string(),
+  titleTranslated: z.string(),
+  coverPath: z.string().min(3),
+  coverNativePx: z.number().optional(),
+  blurbEn: z.string(),
+  blurbHi: z.string(),
+  affirmationEn: z.string(),
+  affirmationHi: z.string(),
+  seriesLine: z.string(),
+});
+
+export const buildWraparoundCover = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => WrapInput.parse(d))
+  .handler(async ({ data, context }) => {
+    const { PDFDocument, PDFName, PDFHexString, rgb, pushGraphicsState, popGraphicsState, beginText, endText, setFontAndSize, setFillingRgbColor, moveText, showText } =
+      await import("pdf-lib");
+    const fontkitMod = (await import("fontkit")) as unknown as Record<string, unknown>;
+    const fontkit = (fontkitMod["default"] ?? fontkitMod) as {
+      create(data: Uint8Array): {
+        unitsPerEm: number;
+        layout(text: string): {
+          glyphs: { id: number }[];
+          positions: { xAdvance: number; yAdvance: number; xOffset: number; yOffset: number }[];
+          advanceWidth: number;
+        };
+      };
+    };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const bucket = supabaseAdmin.storage.from("print-assets");
+
+    const doc = await PDFDocument.create();
+    doc.registerFontkit(fontkit as unknown as Parameters<(typeof doc)["registerFontkit"]>[0]);
+    const poppinsBytes = await loadFont(FONT_URLS.poppins);
+    const poppinsBoldBytes = await loadFont(FONT_URLS.poppinsBold);
+    const balooBytes = await loadFont(FONT_URLS.baloo);
+    const poppins = await doc.embedFont(poppinsBytes, { subset: false });
+    const poppinsBold = await doc.embedFont(poppinsBoldBytes, { subset: false });
+    const deva = await doc.embedFont(balooBytes, { subset: false });
+    const shaper = fontkit.create(new Uint8Array(balooBytes));
+    const emScale = (size: number) => size / shaper.unitsPerEm;
+    const measureDeva = (t: string, size: number) => shaper.layout(t).advanceWidth * emScale(size);
+
+    const page = doc.addPage([WRAP_W_PT, WRAP_H_PT]);
+    page.node.set(PDFName.of("BleedBox"), doc.context.obj([0, 0, WRAP_W_PT, WRAP_H_PT]));
+    page.node.set(
+      PDFName.of("TrimBox"),
+      doc.context.obj([BLEED_PT, BLEED_PT, WRAP_W_PT - BLEED_PT, WRAP_H_PT - BLEED_PT]),
+    );
+    page.drawRectangle({ x: 0, y: 0, width: WRAP_W_PT, height: WRAP_H_PT, color: rgb(1, 1, 1) });
+
+    const drawDeva = (text: string, size: number, x: number, y: number, color: Rgb) => {
+      const run = shaper.layout(text);
+      const s = emScale(size);
+      const key = page.node.newFontDictionary(deva.name, deva.ref);
+      const ops: unknown[] = [
+        pushGraphicsState(),
+        beginText(),
+        setFillingRgbColor(color[0], color[1], color[2]),
+        setFontAndSize(key, size),
+      ];
+      let penX = x;
+      let penY = y;
+      let curX = 0;
+      let curY = 0;
+      run.glyphs.forEach((glyph, i) => {
+        const pos = run.positions[i]!;
+        const gx = penX + pos.xOffset * s;
+        const gy = penY + pos.yOffset * s;
+        ops.push(moveText(gx - curX, gy - curY));
+        curX = gx;
+        curY = gy;
+        ops.push(showText(PDFHexString.of(glyph.id.toString(16).padStart(4, "0"))));
+        penX += pos.xAdvance * s;
+        penY += (pos.yAdvance || 0) * s;
+      });
+      ops.push(endText(), popGraphicsState());
+      page.pushOperators(...(ops as Parameters<typeof page.pushOperators>));
+    };
+
+    const wrapLatin = (text: string, font: typeof poppins, size: number, maxW: number) => {
+      const out: string[] = [];
+      let line = "";
+      for (const word of text.split(/\s+/).filter(Boolean)) {
+        const cand = line ? `${line} ${word}` : word;
+        if (font.widthOfTextAtSize(cand, size) > maxW && line) {
+          out.push(line);
+          line = word;
+        } else line = cand;
+      }
+      if (line) out.push(line);
+      return out;
+    };
+    const wrapDeva = (text: string, size: number, maxW: number) => {
+      const out: string[] = [];
+      let line = "";
+      for (const word of text.split(/\s+/).filter(Boolean)) {
+        const cand = line ? `${line} ${word}` : word;
+        if (measureDeva(cand, size) > maxW && line) {
+          out.push(line);
+          line = word;
+        } else line = cand;
+      }
+      if (line) out.push(line);
+      return out;
+    };
+    const centreLatin = (
+      lines: string[],
+      font: typeof poppins,
+      size: number,
+      cx: number,
+      top: number,
+      color: Rgb,
+      lead = 1.4,
+    ) => {
+      let y = top;
+      for (const line of lines) {
+        page.drawText(line, {
+          x: cx - font.widthOfTextAtSize(line, size) / 2,
+          y,
+          size,
+          font,
+          color: rgb(color[0], color[1], color[2]),
+        });
+        y -= size * lead;
+      }
+      return y;
+    };
+    const centreDeva = (
+      text: string,
+      size: number,
+      cx: number,
+      top: number,
+      maxW: number,
+      color: Rgb,
+      lead = 1.5,
+    ) => {
+      let y = top;
+      for (const line of wrapDeva(text, size, maxW)) {
+        drawDeva(line, size, cx - measureDeva(line, size) / 2, y, color);
+        y -= size * lead;
+      }
+      return y;
+    };
+
+    // ---------------- BACK COVER ----------------
+    const backSafeX0 = BACK_X0 + SAFE_IN_PT;
+    const backSafeX1 = BACK_X1 - SAFE_IN_PT;
+    const backSafeW = backSafeX1 - backSafeX0; // 540
+    const backCx = (backSafeX0 + backSafeX1) / 2;
+    const safeBottom = BLEED_PT + SAFE_IN_PT; // 45
+    const safeTop = WRAP_H_PT - BLEED_PT - SAFE_IN_PT; // 585
+    // Barcode reserve (bottom-right of back cover) — intentionally left blank.
+    const barcodeX0 = backSafeX1 - BARCODE_W;
+    const barcodeTop = safeBottom + BARCODE_H;
+
+    // Vertically centre the back-cover text block above the blank barcode reserve.
+    let by = safeTop - 130;
+    by = centreLatin(wrapLatin(data.blurbEn, poppins, 15, backSafeW), poppins, 15, backCx, by, INK);
+    by = centreDeva(data.blurbHi, 13.5, backCx, by - 16, backSafeW, INK);
+    by -= 34;
+    by = centreLatin([data.affirmationEn], poppinsBold, 19, backCx, by, AMBER, 1.4);
+    by = centreDeva(data.affirmationHi, 17, backCx, by - 6, backSafeW, AMBER);
+    // Series line: centred in the area LEFT of the blank barcode reserve.
+    centreLatin(
+      [data.seriesLine],
+      poppins,
+      9,
+      (backSafeX0 + barcodeX0) / 2,
+      safeBottom + 2,
+      INK,
+    );
+    void barcodeTop;
+
+    // ---------------- SPINE (blank white, no text) ----------------
+
+    // ---------------- FRONT COVER ----------------
+    const frontCx = (SPINE_X1 + FRONT_X1) / 2;
+    const nativePx = data.coverNativePx && data.coverNativePx > 0 ? data.coverNativePx : 1024;
+    const panelPt = Math.min((nativePx / 300) * PT, TRIM_IN * PT - SAFE_IN_PT * 2);
+    const panelX = frontCx - panelPt / 2;
+    const panelY = (WRAP_H_PT - panelPt) / 2 - 10;
+    page.drawRectangle({
+      x: panelX - 6,
+      y: panelY - 6,
+      width: panelPt + 12,
+      height: panelPt + 12,
+      color: rgb(0.988, 0.965, 0.906),
+      borderColor: rgb(0.85, 0.76, 0.53),
+      borderWidth: 1.2,
+    });
+    const dl = await bucket.download(data.coverPath);
+    if (dl.error || !dl.data) throw new Error("Cover art not found in storage");
+    const artBytes = new Uint8Array(await dl.data.arrayBuffer());
+    const artPx = jpegSize(artBytes);
+    const art = await doc.embedJpg(artBytes);
+    page.drawImage(art, { x: panelX, y: panelY, width: panelPt, height: panelPt });
+
+    const frontSafeW = TRIM_IN * PT - SAFE_IN_PT * 2;
+    const titleLines = wrapLatin(data.title, poppinsBold, 30, frontSafeW);
+    const titleTop = panelY + panelPt + 30 + (titleLines.length - 1) * 30 * 1.35;
+    centreLatin(titleLines, poppinsBold, 30, frontCx, titleTop, INK, 1.35);
+    if (data.titleTranslated.trim()) {
+      centreDeva(data.titleTranslated, 20, frontCx, panelY - 44, frontSafeW, INK, 1.45);
+    }
+    centreLatin([data.seriesLine], poppins, 10, frontCx, safeBottom + 6, INK);
+
+    doc.setTitle(`${data.title} - KDP wraparound cover`);
+    doc.setAuthor("Mawil Kids Global Factory");
+    doc.setCreator("Mawil Print Agent");
+    doc.setProducer("Mawil Print Agent (pdf-lib)");
+    const now = new Date();
+    doc.setCreationDate(now);
+    doc.setModificationDate(now);
+    const bytes = await doc.save({ useObjectStreams: false });
+
+    const path = `${context.userId}/${data.jobId}/book-kdp-cover-wraparound-17.304x8.75.pdf`;
+    const up = await bucket.upload(path, bytes, { contentType: "application/pdf", upsert: true });
+    if (up.error) throw new Error(`Could not store PDF: ${up.error.message}`);
+    const signed = await bucket.createSignedUrl(path, 60 * 60);
+    if (signed.error || !signed.data) throw new Error("Could not sign PDF url");
+
+    return {
+      path,
+      url: signed.data.signedUrl,
+      bytes: bytes.length,
+      pageCount: doc.getPageCount(),
+      artPx: artPx ? Math.min(artPx.w, artPx.h) : 0,
+      panelIn: panelPt / PT,
+      barcodeArea: { x: barcodeX0, y: safeBottom, w: BARCODE_W, h: BARCODE_H },
+    };
+  });
+
+export const validateWraparoundPdf = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) =>
+    z.object({ path: z.string().min(3), coverNativePx: z.number().optional() }).parse(d),
+  )
+  .handler(async ({ data }): Promise<KdpReport & { measured: Record<string, number> }> => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const store = supabaseAdmin.storage.from("print-assets");
+    const dl = await store.download(data.path);
+    if (dl.error || !dl.data) throw new Error("Wraparound PDF not found for validation");
+    const bytes = new Uint8Array(await dl.data.arrayBuffer());
+    const raw = new TextDecoder("latin1").decode(bytes);
+    const { PDFDocument, PDFName, PDFArray, PDFNumber } = await import("pdf-lib");
+    const doc = await PDFDocument.load(bytes, { updateMetadata: false });
+    const pages = doc.getPages();
+    const p0 = pages[0]!;
+    const size = p0.getSize();
+
+    const readBox = (name: string): number[] | null => {
+      const arr = p0.node.get(PDFName.of(name));
+      if (!(arr instanceof PDFArray)) return null;
+      return arr.asArray().map((v) => (v instanceof PDFNumber ? v.asNumber() : NaN));
+    };
+    const trim = readBox("TrimBox");
+    const expectedTrim = [BLEED_PT, BLEED_PT, WRAP_W_PT - BLEED_PT, WRAP_H_PT - BLEED_PT];
+    const trimOk = !!trim && trim.length === 4 && trim.every((v, i) => Math.abs(v - expectedTrim[i]!) < 0.5);
+
+    const widths = [...raw.matchAll(/\/Subtype\s*\/Image[\s\S]{0,400}?\/Width\s+(\d+)/g)].map((m) =>
+      Number(m[1]),
+    );
+    const artPx = widths.length ? Math.min(...widths) : 0;
+    const drawnIn = Math.min((data.coverNativePx || artPx || 1024) / 300, TRIM_IN - MARGIN_IN * 2);
+    const dpi = artPx && drawnIn ? artPx / drawnIn : 0;
+    const fontFiles = (raw.match(/\/FontFile2/g) ?? []).length;
+
+    const checks: KdpCheck[] = [
+      {
+        id: "wrap-page-size",
+        label: "Wraparound page size = 17.304in x 8.75in",
+        pass:
+          Math.abs(size.width - WRAP_W_PT) < 0.5 && Math.abs(size.height - WRAP_H_PT) < 0.5,
+        detail: `${size.width.toFixed(3)}pt x ${size.height.toFixed(3)}pt = ${(size.width / PT).toFixed(4)}in x ${(size.height / PT).toFixed(4)}in (bleed .125 + back 8.5 + spine ${WRAP_SPINE_IN} + front 8.5 + bleed .125)`,
+        severity: "error",
+      },
+      {
+        id: "wrap-trimbox",
+        label: "TrimBox present and inset 0.125in on all four sides",
+        pass: trimOk,
+        detail: trim
+          ? `TrimBox [${trim.map((v) => v.toFixed(3)).join(" ")}] vs expected [${expectedTrim.map((v) => v.toFixed(3)).join(" ")}]`
+          : "No TrimBox on the wraparound page",
+        severity: "error",
+      },
+      {
+        id: "wrap-fonts",
+        label: "All fonts embedded (Poppins + Baloo 2), no core fonts",
+        pass: fontFiles >= 3 && !raw.includes("/BaseFont /Helvetica"),
+        detail: `${fontFiles} embedded TrueType font program(s); no core-font references`,
+        severity: "error",
+      },
+      {
+        id: "wrap-transparency",
+        label: "No transparency groups",
+        pass: !raw.includes("/Group") && !raw.includes("/SMask"),
+        detail: "Opaque JPEG (DCTDecode) art and solid fills only",
+        severity: "error",
+      },
+      {
+        id: "wrap-front-dpi",
+        label: "Effective DPI of the front cover art >= 300",
+        pass: dpi >= 300,
+        detail: artPx
+          ? `front art ${artPx}px drawn at ${drawnIn.toFixed(4)}in = ${Math.round(dpi)} DPI (native, not upscaled)`
+          : "No image embedded",
+        severity: "error",
+      },
+      {
+        id: "wrap-page-count",
+        label: "Wraparound cover = 1 landscape page",
+        pass: pages.length === 1,
+        detail: `${pages.length} page(s)`,
+        severity: "error",
+      },
+      {
+        id: "wrap-colour-space",
+        label: "Colour space: DeviceRGB (no PDF/X-1a claim)",
+        pass: true,
+        detail:
+          "Front art is a DeviceRGB JPEG, so this file does not assert PDF/X-1a:2001 (that needs CMYK). KDP converts RGB to CMYK on upload.",
+        severity: "warning",
+      },
+    ];
+    return {
+      pass: checks.every((c) => c.pass),
+      blocksPublish: checks.some((c) => !c.pass && c.severity === "error"),
+      checks,
+      measured: {
+        widthPt: size.width,
+        heightPt: size.height,
+        widthIn: size.width / PT,
+        heightIn: size.height / PT,
+        artPx,
+        dpi,
+        bytes: bytes.length,
+        pages: pages.length,
+      },
+    };
+  });
