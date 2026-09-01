@@ -17,6 +17,7 @@ export async function kdpValidatorAgent(book: Book, layout?: LayoutResult): Prom
       path: result.interior.path,
       coverPath: result.cover.path,
       trueSourcePx: result.meta.trueSourcePx,
+      coverNativePx: result.meta.coverNativePx,
     },
   });
 }
