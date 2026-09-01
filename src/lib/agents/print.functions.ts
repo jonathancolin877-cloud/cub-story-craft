@@ -88,6 +88,8 @@ const Input = z.object({
   coverPath: z.string().optional(),
   /** True generated pixel size of the illustrations before any upscale. */
   trueSourcePx: z.number().optional(),
+  /** True native pixel size of the cover image as uploaded (no upscale). */
+  coverNativePx: z.number().optional(),
   pages: z.array(PageInput).min(1),
 });
 
