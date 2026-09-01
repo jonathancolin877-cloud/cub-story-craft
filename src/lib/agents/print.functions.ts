@@ -37,7 +37,12 @@ const FONT_URLS = {
   // Mukta (Ek Type) shapes cleanly with fontkit; Noto Devanagari trips a
   // fontkit GPOS mark-anchor bug in this runtime.
   devanagari: "https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/mukta/Mukta-Regular.ttf",
+  // Cover-only display faces.
+  poppins: "https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/poppins/Poppins-Regular.ttf",
+  poppinsBold: "https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/poppins/Poppins-Bold.ttf",
+  baloo: "https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/baloo2/Baloo2%5Bwght%5D.ttf",
 } as const;
+
 
 const fontCache = new Map<string, ArrayBuffer>();
 async function loadFont(url: string) {
