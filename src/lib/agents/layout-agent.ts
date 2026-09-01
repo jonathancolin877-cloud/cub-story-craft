@@ -29,6 +29,7 @@ export type LayoutResult = {
     safeMarginIn: number;
     imagePx: number;
     trueSourcePx: number;
+    coverNativePx: number;
   };
 };
 
