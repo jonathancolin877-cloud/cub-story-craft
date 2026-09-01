@@ -83,36 +83,41 @@ export async function layoutAgent(
   if (!uid) throw new Error("Sign in to build the print-ready PDF");
 
   smallestTrueSourcePx = Infinity;
+  coverNativePx = 0;
   const jobId = `${slug(book.title)}-${Date.now()}`;
   const bucket = supabase.storage.from("print-assets");
   const total = book.pages.length + 1;
   let done = 0;
 
-  const upload = async (src: string | undefined, name: string) => {
+  const upload = async (src: string | undefined, name: string, px = PRINT_SPEC.printPx) => {
     done++;
     onProgress?.(done, total);
     if (!src) return undefined;
-    const blob = await printJpeg(src);
-    if (!blob) return undefined;
+    const encoded = await printJpeg(src, px);
+    if (!encoded) return undefined;
     const path = `${uid}/${jobId}/${name}.jpg`;
-    const { error } = await bucket.upload(path, blob, {
+    const { error } = await bucket.upload(path, encoded.blob, {
       contentType: "image/jpeg",
       upsert: true,
     });
     if (error) throw new Error(`Upload failed: ${error.message}`);
-    return path;
+    return { path, px: encoded.px };
   };
 
-  const coverPath = await upload(book.coverImage, "cover");
+  // Cover ships at its NATIVE generated size (no upscale) so the panel layout
+  // can place it at exactly nativePx / 300 inches = true 300 DPI.
+  const coverUp = await upload(book.coverImage, "cover", 0);
+  const coverPath = coverUp?.path;
+  coverNativePx = coverUp?.px ?? 0;
   const pages: { page: number; en: string; translated: string; fact: string; path?: string }[] = [];
   for (const p of book.pages) {
-    const path = await upload(p.image, `p${String(p.page).padStart(2, "0")}`);
+    const up = await upload(p.image, `p${String(p.page).padStart(2, "0")}`);
     pages.push({
       page: p.page,
       en: p.en,
       translated: p.translated,
       fact: p.fact,
-      ...(path ? { path } : {}),
+      ...(up ? { path: up.path } : {}),
     });
   }
 
@@ -125,9 +130,11 @@ export async function layoutAgent(
       titleTranslated: book.titleTranslated,
       ...(coverPath ? { coverPath } : {}),
       trueSourcePx,
+      coverNativePx,
       pages,
     },
   });
+
 
   const base = slug(book.title);
   const file = (
