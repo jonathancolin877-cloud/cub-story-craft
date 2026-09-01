@@ -83,6 +83,7 @@ function Studio() {
   const [printFiles, setPrintFiles] = useState<{
     interior: PrintFile;
     cover: PrintFile;
+    wraparound: PrintFile;
   } | null>(null);
 
   useEffect(() => {
@@ -117,7 +118,11 @@ function Studio() {
       setPrinting("Validating print files...");
       const report = await agents.validate(book, layout);
       setKdpReport(report);
-      setPrintFiles({ interior: layout.interior, cover: layout.cover });
+      setPrintFiles({
+        interior: layout.interior,
+        cover: layout.cover,
+        wraparound: layout.wraparound,
+      });
       if (report.pass) toast.success("Interior + cover PDFs built and validated");
       else if (!report.blocksPublish)
         toast.warning("Interior + cover PDFs built - passed with warnings, see report");
@@ -593,6 +598,12 @@ function Studio() {
                   title="Cover"
                   sub={`${Math.round(printFiles.cover.bytes / 1024)} KB`}
                   onClick={() => printFiles.cover.save()}
+                />
+                <ExportButton
+                  icon={<FileText className="h-4 w-4" />}
+                  title="Wraparound cover (17.304×8.75in)"
+                  sub={`Back + blank spine + front · ${Math.round(printFiles.wraparound.bytes / 1024)} KB`}
+                  onClick={() => printFiles.wraparound.save()}
                 />
               </div>
             )}
