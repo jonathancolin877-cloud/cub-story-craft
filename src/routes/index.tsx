@@ -119,6 +119,8 @@ function Studio() {
       setKdpReport(report);
       setPrintFiles({ interior: layout.interior, cover: layout.cover });
       if (report.pass) toast.success("Interior + cover PDFs built and validated");
+      else if (!report.blocksPublish)
+        toast.warning("Interior + cover PDFs built - passed with warnings, see report");
       else toast.error("PDF exported but KDP validation failed - see report");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "PDF export failed");
