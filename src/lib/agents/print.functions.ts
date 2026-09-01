@@ -529,13 +529,17 @@ export const validatePrintPdf = createServerFn({ method: "POST" })
       },
       {
         id: "embedded-px",
-        label: `Embedded image size >= ${REQUIRED_IMAGE_PX}px (print sizing)`,
-        pass: widths.length > 0 && imgMin >= REQUIRED_IMAGE_PX,
+        label: "Effective image resolution >= 300 DPI (as drawn)",
+        pass: widths.length > 0 && interiorDpi >= 300 && (!coverImgPx || coverDpi >= 300),
         detail: widths.length
-          ? `${widths.length} image(s) in the interior, smallest ${imgMin}px (upscaled from ${trueSrc || "unknown"}px)`
+          ? `interior art ${imgMin}px drawn at ${INTERIOR_IMG_IN}in = ${Math.round(interiorDpi)} DPI (upscaled from ${trueSrc || "unknown"}px); ` +
+            (coverImgPx
+              ? `cover art ${coverImgPx}px drawn at ${coverDrawnIn.toFixed(2)}in = ${Math.round(coverDpi)} DPI (native, not upscaled)`
+              : "cover file not checked")
           : "No images embedded",
         severity: "error",
       },
+
       {
         id: "colour-space",
         label: "Colour space: DeviceRGB (no PDF/X-1a claim)",
