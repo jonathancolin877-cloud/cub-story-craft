@@ -474,15 +474,23 @@ export const validatePrintPdf = createServerFn({ method: "POST" })
     const pages = doc.getPages();
 
     let coverPages = 0;
+    let coverImgPx = 0;
     if (data.coverPath) {
       const cdl = await store.download(data.coverPath);
       if (!cdl.error && cdl.data) {
-        const cdoc = await PDFDocument.load(new Uint8Array(await cdl.data.arrayBuffer()), {
+        const cbytes = new Uint8Array(await cdl.data.arrayBuffer());
+        const cdoc = await PDFDocument.load(cbytes, {
           updateMetadata: false,
         });
         coverPages = cdoc.getPageCount();
+        const craw = new TextDecoder("latin1").decode(cbytes);
+        const cw = [...craw.matchAll(/\/Subtype\s*\/Image[\s\S]{0,400}?\/Width\s+(\d+)/g)].map((m) =>
+          Number(m[1]),
+        );
+        coverImgPx = cw.length ? Math.min(...cw) : 0;
       }
     }
+
 
     const count = (re: RegExp) => (raw.match(re) ?? []).length;
     const widths = [...raw.matchAll(/\/Subtype\s*\/Image[\s\S]{0,400}?\/Width\s+(\d+)/g)].map((m) =>
