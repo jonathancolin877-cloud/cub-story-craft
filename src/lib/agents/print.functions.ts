@@ -92,6 +92,8 @@ const Input = z.object({
   trueSourcePx: z.number().optional(),
   /** True native pixel size of the cover image as uploaded (no upscale). */
   coverNativePx: z.number().optional(),
+  /** Rebuild only the cover PDF, leaving any existing interior file untouched. */
+  coverOnly: z.boolean().optional(),
   pages: z.array(PageInput).min(1),
 });
 
