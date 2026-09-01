@@ -37,29 +37,41 @@ const slug = (s: string) =>
 
 /** True generated pixel size of an illustration, before any upscale. */
 let smallestTrueSourcePx = Infinity;
+/** True native pixel size of the cover art (uploaded without upscaling). */
+let coverNativePx = 0;
 
-/** Upscale a 1:1 illustration to the exact 300 DPI print size and return a JPEG blob. */
-async function printJpeg(src: string, px = PRINT_SPEC.printPx): Promise<Blob | null> {
+/**
+ * Encode a 1:1 illustration as JPEG.
+ * `px = 0` keeps the NATIVE generated size (used for the cover panel, which is
+ * drawn at nativePx/300 inches so it is a true 300 DPI placement).
+ */
+async function printJpeg(
+  src: string,
+  px: number = PRINT_SPEC.printPx,
+): Promise<{ blob: Blob; px: number } | null> {
   const img = new Image();
   img.crossOrigin = "anonymous";
   img.src = src;
   await img.decode();
-  smallestTrueSourcePx = Math.min(
-    smallestTrueSourcePx,
-    Math.min(img.naturalWidth, img.naturalHeight),
-  );
+  const nativePx = Math.min(img.naturalWidth, img.naturalHeight);
+  smallestTrueSourcePx = Math.min(smallestTrueSourcePx, nativePx);
+  const out = px || nativePx;
   const canvas = document.createElement("canvas");
-  canvas.width = px;
-  canvas.height = px;
+  canvas.width = out;
+  canvas.height = out;
   const ctx = canvas.getContext("2d");
   if (!ctx) return null;
   ctx.fillStyle = "#ffffff";
-  ctx.fillRect(0, 0, px, px);
+  ctx.fillRect(0, 0, out, out);
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = "high";
-  ctx.drawImage(img, 0, 0, px, px); // source is square - pure upscale, never a crop
-  return await new Promise((resolve) => canvas.toBlob((b) => resolve(b), "image/jpeg", 0.9));
+  ctx.drawImage(img, 0, 0, out, out); // source is square - pure upscale, never a crop
+  const blob = await new Promise<Blob | null>((resolve) =>
+    canvas.toBlob((b) => resolve(b), "image/jpeg", px ? 0.9 : 0.92),
+  );
+  return blob ? { blob, px: out } : null;
 }
+
 
 
 export async function layoutAgent(
