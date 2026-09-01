@@ -457,6 +457,7 @@ export const validatePrintPdf = createServerFn({ method: "POST" })
         path: z.string().min(3),
         coverPath: z.string().optional(),
         trueSourcePx: z.number().optional(),
+        coverNativePx: z.number().optional(),
       })
       .parse(d),
   )
