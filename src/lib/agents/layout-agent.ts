@@ -164,6 +164,7 @@ export async function layoutAgent(
       safeMarginIn: PRINT_SPEC.safeMarginIn,
       imagePx: PRINT_SPEC.printPx,
       trueSourcePx,
+      coverNativePx,
     },
   };
 }
