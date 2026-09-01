@@ -89,7 +89,7 @@ export async function layoutAgent(
   const total = book.pages.length + 1;
   let done = 0;
 
-  const upload = async (src: string | undefined, name: string, px = PRINT_SPEC.printPx) => {
+  const upload = async (src: string | undefined, name: string, px: number = PRINT_SPEC.printPx) => {
     done++;
     onProgress?.(done, total);
     if (!src) return undefined;
