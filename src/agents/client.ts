@@ -21,7 +21,8 @@ export const agents = {
     const layout = await layoutAgent(book, onProgress);
     const report = await kdpValidatorAgent(book, layout);
     if (report.blocksPublish) return { exported: false as const, report, layout };
-    layout.save();
+    layout.interior.save();
+    layout.cover.save();
     return { exported: true as const, report, layout };
   },
 };

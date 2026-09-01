@@ -42,6 +42,7 @@ import {
 } from "@/lib/book-types";
 import { exportReels, exportYoutubeScript } from "@/lib/exports";
 import { agents, type KdpReport } from "@/agents/client";
+import type { PrintFile } from "@/lib/agents/layout-agent";
 import { fetchLastBook, saveArtwork, upsertBook } from "@/lib/book-store";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -79,6 +80,10 @@ function Studio() {
   const [kdpValidated, setKdpValidated] = useState(false);
   const [printing, setPrinting] = useState<string | null>(null);
   const [kdpReport, setKdpReport] = useState<KdpReport | null>(null);
+  const [printFiles, setPrintFiles] = useState<{
+    interior: PrintFile;
+    cover: PrintFile;
+  } | null>(null);
 
   useEffect(() => {
     try {
@@ -103,16 +108,17 @@ function Studio() {
       toast("Exporting with current images");
     }
     setKdpReport(null);
+    setPrintFiles(null);
     try {
       setPrinting("Preparing 2625px art...");
       const layout = await agents.layout(book, (done, total) =>
         setPrinting(`Uploading print art ${done}/${total}...`),
       );
-      setPrinting("Validating PDF/X-1a...");
+      setPrinting("Validating print files...");
       const report = await agents.validate(book, layout);
       setKdpReport(report);
-      layout.save();
-      if (report.pass) toast.success("PDF/X-1a exported and validated");
+      setPrintFiles({ interior: layout.interior, cover: layout.cover });
+      if (report.pass) toast.success("Interior + cover PDFs built and validated");
       else toast.error("PDF exported but KDP validation failed - see report");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "PDF export failed");

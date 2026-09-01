@@ -141,7 +141,7 @@ export async function layoutAgent(
       pageSizeIn: PRINT_SPEC.trimIn + PRINT_SPEC.bleedIn * 2,
       trimIn: PRINT_SPEC.trimIn,
       bleedIn: PRINT_SPEC.bleedIn,
-      safeMarginIn: PRINT_SPEC.printPx,
+      safeMarginIn: PRINT_SPEC.safeMarginIn,
       imagePx: PRINT_SPEC.printPx,
       trueSourcePx,
     },
