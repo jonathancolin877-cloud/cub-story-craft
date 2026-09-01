@@ -225,6 +225,7 @@ function Studio() {
           scene: `Book cover illustration. ${book.coverScene}`,
           characterBible: characterBible(book),
           characterSheet: book.characterSheet,
+          bookId: id,
         },
       });
       current = { ...current, coverImage: cover.image };
@@ -239,6 +240,7 @@ function Studio() {
             scene: page.scene,
             characterBible: characterBible(current),
             characterSheet: current.characterSheet,
+            bookId: id,
           },
         });
         const pages = [...current.pages];
@@ -507,7 +509,7 @@ function Studio() {
                     <img
                       src={book.coverImage}
                       alt={`Cover of ${book.title}`}
-                      className="h-full w-full object-cover"
+                      className="h-full w-full object-contain"
                     />
                   ) : (
                     <div className="grid h-full place-items-center text-4xl">📕</div>
@@ -529,12 +531,12 @@ function Studio() {
                     key={p.page}
                     className="overflow-hidden rounded-2xl border border-border bg-background"
                   >
-                    <div className="relative aspect-[4/3] bg-muted">
+                    <div className="relative aspect-square bg-muted">
                       {p.image ? (
                         <img
                           src={p.image}
                           alt={p.scene}
-                          className="h-full w-full object-cover"
+                          className="h-full w-full object-contain"
                           loading="lazy"
                         />
                       ) : (
