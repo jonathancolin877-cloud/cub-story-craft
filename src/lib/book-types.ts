@@ -71,6 +71,10 @@ export type Book = {
   coverScene: string;
   coverImage?: string | undefined;
   blurb: string;
+  /** Optional second-language back-cover copy for the wraparound cover. */
+  blurbTranslated?: string;
+  affirmationEn?: string;
+  affirmationTranslated?: string;
   pages: BookPage[];
 };
 

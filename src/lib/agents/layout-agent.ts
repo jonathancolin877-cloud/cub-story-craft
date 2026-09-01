@@ -1,6 +1,6 @@
 import { PRINT_SPEC, type Book } from "@/lib/book-types";
 import { supabase } from "@/integrations/supabase/client";
-import { buildPrintPdf } from "./print.functions";
+import { buildPrintPdf, buildWraparoundCover } from "./print.functions";
 
 /**
  * LAYOUT AGENT (client half)
@@ -17,9 +17,13 @@ export type PrintFile = {
   save: () => void;
 };
 
+export const SERIES_LINE = "Mawil Kids Global Factory - Little Zoologists of the World";
+
 export type LayoutResult = {
   interior: PrintFile;
   cover: PrintFile;
+  /** Single-sheet KDP wraparound: back + spine + front, 17.304in x 8.75in. */
+  wraparound: PrintFile;
   /** Kept for callers that still want a single "the PDF" handle (the interior). */
   path: string;
   meta: {
@@ -153,10 +157,26 @@ export async function layoutAgent(
     },
   });
 
+  const wrap = await buildWraparoundCover({
+    data: {
+      jobId,
+      title: book.title,
+      titleTranslated: book.titleTranslated,
+      coverPath: coverPath ?? "",
+      coverNativePx,
+      blurbEn: book.blurb,
+      blurbHi: book.blurbTranslated ?? "",
+      affirmationEn: book.affirmationEn ?? "",
+      affirmationHi: book.affirmationTranslated ?? "",
+      seriesLine: SERIES_LINE,
+    },
+  });
+
   const interior = result.interior!;
   return {
     interior: file(interior, `${base}-kdp-interior-8.5x8.5.pdf`),
     cover: file(result.cover, `${base}-kdp-cover-8.5x8.5.pdf`),
+    wraparound: file(wrap, `${base}-kdp-cover-wraparound-17.304x8.75.pdf`),
     path: interior.path,
     meta: {
       pageSizeIn: PRINT_SPEC.trimIn + PRINT_SPEC.bleedIn * 2,
