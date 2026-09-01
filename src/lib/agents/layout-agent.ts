@@ -153,10 +153,11 @@ export async function layoutAgent(
     },
   });
 
+  const interior = result.interior!;
   return {
-    interior: file(result.interior, `${base}-kdp-interior-8.5x8.5.pdf`),
+    interior: file(interior, `${base}-kdp-interior-8.5x8.5.pdf`),
     cover: file(result.cover, `${base}-kdp-cover-8.5x8.5.pdf`),
-    path: result.interior.path,
+    path: interior.path,
     meta: {
       pageSizeIn: PRINT_SPEC.trimIn + PRINT_SPEC.bleedIn * 2,
       trimIn: PRINT_SPEC.trimIn,
@@ -168,4 +169,37 @@ export async function layoutAgent(
     },
   };
 }
+
+/**
+ * Rebuild ONLY the cover PDF (native-resolution panel layout) into an existing
+ * job folder. The interior PDF in that folder is never read or rewritten.
+ */
+export async function rebuildCover(book: Book, jobId: string) {
+  const { data: sessionData } = await supabase.auth.getSession();
+  const uid = sessionData.session?.user.id;
+  if (!uid) throw new Error("Sign in to build the print-ready PDF");
+  if (!book.coverImage) throw new Error("This book has no cover illustration");
+
+  const encoded = await printJpeg(book.coverImage, 0);
+  if (!encoded) throw new Error("Could not encode the cover illustration");
+  const coverPath = `${uid}/${jobId}/cover-native.jpg`;
+  const { error } = await supabase.storage
+    .from("print-assets")
+    .upload(coverPath, encoded.blob, { contentType: "image/jpeg", upsert: true });
+  if (error) throw new Error(`Upload failed: ${error.message}`);
+
+  const result = await buildPrintPdf({
+    data: {
+      jobId,
+      title: book.title,
+      titleTranslated: book.titleTranslated,
+      coverPath,
+      coverNativePx: encoded.px,
+      coverOnly: true,
+      pages: [{ page: 1, en: "", translated: "", fact: "" }],
+    },
+  });
+  return { cover: result.cover, coverNativePx: encoded.px };
+}
+
 
