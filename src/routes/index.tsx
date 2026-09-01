@@ -571,11 +571,27 @@ function Studio() {
           <div className="space-y-3">
             <ExportButton
               icon={<FileText className="h-4 w-4" />}
-              title={printing ?? "Export PDF (PDF/X-1a)"}
-              sub="Server-built · embedded fonts · 2625px images · 8.5×8.5in + bleed"
+              title={printing ?? "Build KDP print files"}
+              sub="Server-built · embedded fonts · 8.5×8.5in + 0.125in bleed · RGB print-ready"
               onClick={() => void onExportPrintPdf()}
 
             />
+            {printFiles && (
+              <div className="grid grid-cols-2 gap-2">
+                <ExportButton
+                  icon={<FileText className="h-4 w-4" />}
+                  title={`Interior (${printFiles.interior.pageCount} pages)`}
+                  sub={`${Math.round(printFiles.interior.bytes / 1024)} KB`}
+                  onClick={() => printFiles.interior.save()}
+                />
+                <ExportButton
+                  icon={<FileText className="h-4 w-4" />}
+                  title="Cover"
+                  sub={`${Math.round(printFiles.cover.bytes / 1024)} KB`}
+                  onClick={() => printFiles.cover.save()}
+                />
+              </div>
+            )}
             <ExportButton
               icon={<Film className="h-4 w-4" />}
               title="Export YouTube Script"
@@ -606,17 +622,30 @@ function Studio() {
           </div>
 
           {kdpReport && (
-            <div className="mt-4 space-y-1 rounded-2xl border border-border bg-background p-3 text-xs">
+            <div className="mt-4 space-y-2 rounded-2xl border border-border bg-background p-3 text-xs">
               <p className="font-bold">
-                KDP validator: {kdpReport.pass ? "PASS" : "FAIL - publish blocked"}
+                KDP validator: {kdpReport.pass ? "PASS" : kdpReport.blocksPublish ? "FAIL - publish blocked" : "PASS with warnings"}
               </p>
               {kdpReport.checks.map((c) => (
-                <p key={c.id} className={c.pass ? "text-primary" : "text-destructive"}>
-                  {c.pass ? "✓" : "✕"} {c.label} — {c.detail}
-                </p>
+                <div
+                  key={c.id}
+                  className={
+                    c.pass
+                      ? "text-primary"
+                      : c.severity === "warning"
+                        ? "text-amber-600"
+                        : "text-destructive"
+                  }
+                >
+                  <p className="font-semibold">
+                    {c.pass ? "✓" : c.severity === "warning" ? "!" : "✕"} {c.label}
+                  </p>
+                  <p className="text-muted-foreground">{c.detail}</p>
+                </div>
               ))}
             </div>
           )}
+
           <p className="mt-4 rounded-2xl bg-secondary p-3 text-xs text-secondary-foreground">
             Tip: generate illustrations before exporting the PDF so artwork is embedded.
           </p>
