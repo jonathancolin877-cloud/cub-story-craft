@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthRouteImport } from './routes/auth'
+import { Route as DevCoverRouteImport } from './routes/dev-cover'
 import { Route as LandingRouteImport } from './routes/landing'
 import { Route as LibraryRouteImport } from './routes/library'
 
@@ -22,6 +23,11 @@ const IndexRoute = IndexRouteImport.update({
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
   path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DevCoverRoute = DevCoverRouteImport.update({
+  id: '/dev-cover',
+  path: '/dev-cover',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LandingRoute = LandingRouteImport.update({
@@ -38,12 +44,14 @@ const LibraryRoute = LibraryRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/dev-cover': typeof DevCoverRoute
   '/landing': typeof LandingRoute
   '/library': typeof LibraryRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/dev-cover': typeof DevCoverRoute
   '/landing': typeof LandingRoute
   '/library': typeof LibraryRoute
 }
@@ -51,20 +59,22 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/dev-cover': typeof DevCoverRoute
   '/landing': typeof LandingRoute
   '/library': typeof LibraryRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/auth' | '/landing' | '/library'
+  fullPaths: '/' | '/auth' | '/dev-cover' | '/landing' | '/library'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/auth' | '/landing' | '/library'
-  id: '__root__' | '/' | '/auth' | '/landing' | '/library'
+  to: '/' | '/auth' | '/dev-cover' | '/landing' | '/library'
+  id: '__root__' | '/' | '/auth' | '/dev-cover' | '/landing' | '/library'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthRoute: typeof AuthRoute
+  DevCoverRoute: typeof DevCoverRoute
   LandingRoute: typeof LandingRoute
   LibraryRoute: typeof LibraryRoute
 }
@@ -83,6 +93,13 @@ declare module '@tanstack/react-router' {
       path: '/auth'
       fullPath: '/auth'
       preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dev-cover': {
+      id: '/dev-cover'
+      path: '/dev-cover'
+      fullPath: '/dev-cover'
+      preLoaderRoute: typeof DevCoverRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/landing': {
@@ -105,6 +122,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthRoute: AuthRoute,
+  DevCoverRoute: DevCoverRoute,
   LandingRoute: LandingRoute,
   LibraryRoute: LibraryRoute,
 }
