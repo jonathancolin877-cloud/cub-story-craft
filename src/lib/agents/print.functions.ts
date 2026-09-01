@@ -373,7 +373,7 @@ export const buildPrintPdf = createServerFn({ method: "POST" })
 
     // ---- Interior file (story pages only, no cover) ----
     const it = await makeDoc();
-    const IMG = 5.5 * PT; // 396pt square, never cropped
+    const IMG = INTERIOR_IMG_IN * PT; // 396pt square, never cropped
     for (const p of data.pages) {
       const page = it.newPage();
       await it.drawImage(page, p.path, (PAGE_PT - IMG) / 2, PAGE_PT - SAFE_PT - IMG, IMG);
