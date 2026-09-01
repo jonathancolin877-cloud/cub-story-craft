@@ -26,6 +26,8 @@ const SAFE_PT = (BLEED_IN + MARGIN_IN) * PT; // 45
 const SAFE_W = PAGE_PT - SAFE_PT * 2; // 540
 /** Print sizing target (upscaled). */
 export const REQUIRED_IMAGE_PX = 2625;
+/** Interior illustrations are drawn as a 5.5in square. */
+const INTERIOR_IMG_IN = 5.5;
 /** Honest minimum for TRUE generated pixels before upscaling. */
 export const REQUIRED_TRUE_SOURCE_PX = 2048;
 
