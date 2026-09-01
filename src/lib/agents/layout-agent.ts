@@ -70,6 +70,7 @@ export async function layoutAgent(
   const uid = sessionData.session?.user.id;
   if (!uid) throw new Error("Sign in to build the print-ready PDF");
 
+  smallestTrueSourcePx = Infinity;
   const jobId = `${slug(book.title)}-${Date.now()}`;
   const bucket = supabase.storage.from("print-assets");
   const total = book.pages.length + 1;
@@ -103,36 +104,47 @@ export async function layoutAgent(
     });
   }
 
+  const trueSourcePx = Number.isFinite(smallestTrueSourcePx) ? smallestTrueSourcePx : 0;
+
   const result = await buildPrintPdf({
     data: {
       jobId,
       title: book.title,
       titleTranslated: book.titleTranslated,
       ...(coverPath ? { coverPath } : {}),
+      trueSourcePx,
       pages,
     },
   });
 
-  const filename = `${slug(book.title)}-kdp-8.5x8.5-pdfx1a.pdf`;
-  return {
+  const base = slug(book.title);
+  const file = (
+    part: { path: string; url: string; bytes: number; pageCount: number },
+    filename: string,
+  ) => ({
+    ...part,
     filename,
-    path: result.path,
-    url: result.url,
-    meta: {
-      pageCount: result.pageCount,
-      pageSizeIn: PRINT_SPEC.trimIn + PRINT_SPEC.bleedIn * 2,
-      trimIn: PRINT_SPEC.trimIn,
-      bleedIn: PRINT_SPEC.bleedIn,
-      safeMarginIn: PRINT_SPEC.safeMarginIn,
-      imagePx: PRINT_SPEC.printPx,
-      bytes: result.bytes,
-    },
     save: () => {
       const a = document.createElement("a");
-      a.href = result.url;
+      a.href = part.url;
       a.download = filename;
       a.rel = "noopener";
       a.click();
     },
+  });
+
+  return {
+    interior: file(result.interior, `${base}-kdp-interior-8.5x8.5.pdf`),
+    cover: file(result.cover, `${base}-kdp-cover-8.5x8.5.pdf`),
+    path: result.interior.path,
+    meta: {
+      pageSizeIn: PRINT_SPEC.trimIn + PRINT_SPEC.bleedIn * 2,
+      trimIn: PRINT_SPEC.trimIn,
+      bleedIn: PRINT_SPEC.bleedIn,
+      safeMarginIn: PRINT_SPEC.printPx,
+      imagePx: PRINT_SPEC.printPx,
+      trueSourcePx,
+    },
   };
 }
+
