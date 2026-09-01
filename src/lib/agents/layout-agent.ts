@@ -8,24 +8,35 @@ import { buildPrintPdf } from "./print.functions";
  * JPEG (8.75in incl. 0.125in bleed @ 300 DPI) - uploads them to private
  * storage, then asks the server print agent to emit the real PDF/X-1a file.
  */
-export type LayoutResult = {
+export type PrintFile = {
   filename: string;
   path: string;
   url: string;
+  bytes: number;
+  pageCount: number;
+  save: () => void;
+};
+
+export type LayoutResult = {
+  interior: PrintFile;
+  cover: PrintFile;
+  /** Kept for callers that still want a single "the PDF" handle (the interior). */
+  path: string;
   meta: {
-    pageCount: number;
     pageSizeIn: number;
     trimIn: number;
     bleedIn: number;
     safeMarginIn: number;
     imagePx: number;
-    bytes: number;
+    trueSourcePx: number;
   };
-  save: () => void;
 };
 
 const slug = (s: string) =>
   s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "book";
+
+/** True generated pixel size of an illustration, before any upscale. */
+let smallestTrueSourcePx = Infinity;
 
 /** Upscale a 1:1 illustration to the exact 300 DPI print size and return a JPEG blob. */
 async function printJpeg(src: string, px = PRINT_SPEC.printPx): Promise<Blob | null> {
@@ -33,6 +44,10 @@ async function printJpeg(src: string, px = PRINT_SPEC.printPx): Promise<Blob | n
   img.crossOrigin = "anonymous";
   img.src = src;
   await img.decode();
+  smallestTrueSourcePx = Math.min(
+    smallestTrueSourcePx,
+    Math.min(img.naturalWidth, img.naturalHeight),
+  );
   const canvas = document.createElement("canvas");
   canvas.width = px;
   canvas.height = px;
@@ -46,6 +61,7 @@ async function printJpeg(src: string, px = PRINT_SPEC.printPx): Promise<Blob | n
   return await new Promise((resolve) => canvas.toBlob((b) => resolve(b), "image/jpeg", 0.9));
 }
 
+
 export async function layoutAgent(
   book: Book,
   onProgress?: (done: number, total: number) => void,
@@ -54,6 +70,7 @@ export async function layoutAgent(
   const uid = sessionData.session?.user.id;
   if (!uid) throw new Error("Sign in to build the print-ready PDF");
 
+  smallestTrueSourcePx = Infinity;
   const jobId = `${slug(book.title)}-${Date.now()}`;
   const bucket = supabase.storage.from("print-assets");
   const total = book.pages.length + 1;
@@ -87,36 +104,47 @@ export async function layoutAgent(
     });
   }
 
+  const trueSourcePx = Number.isFinite(smallestTrueSourcePx) ? smallestTrueSourcePx : 0;
+
   const result = await buildPrintPdf({
     data: {
       jobId,
       title: book.title,
       titleTranslated: book.titleTranslated,
       ...(coverPath ? { coverPath } : {}),
+      trueSourcePx,
       pages,
     },
   });
 
-  const filename = `${slug(book.title)}-kdp-8.5x8.5-pdfx1a.pdf`;
-  return {
+  const base = slug(book.title);
+  const file = (
+    part: { path: string; url: string; bytes: number; pageCount: number },
+    filename: string,
+  ) => ({
+    ...part,
     filename,
-    path: result.path,
-    url: result.url,
+    save: () => {
+      const a = document.createElement("a");
+      a.href = part.url;
+      a.download = filename;
+      a.rel = "noopener";
+      a.click();
+    },
+  });
+
+  return {
+    interior: file(result.interior, `${base}-kdp-interior-8.5x8.5.pdf`),
+    cover: file(result.cover, `${base}-kdp-cover-8.5x8.5.pdf`),
+    path: result.interior.path,
     meta: {
-      pageCount: result.pageCount,
       pageSizeIn: PRINT_SPEC.trimIn + PRINT_SPEC.bleedIn * 2,
       trimIn: PRINT_SPEC.trimIn,
       bleedIn: PRINT_SPEC.bleedIn,
       safeMarginIn: PRINT_SPEC.safeMarginIn,
       imagePx: PRINT_SPEC.printPx,
-      bytes: result.bytes,
-    },
-    save: () => {
-      const a = document.createElement("a");
-      a.href = result.url;
-      a.download = filename;
-      a.rel = "noopener";
-      a.click();
+      trueSourcePx,
     },
   };
 }
+
