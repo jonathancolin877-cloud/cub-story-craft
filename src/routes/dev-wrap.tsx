@@ -9,6 +9,10 @@ export const Route = createFileRoute("/dev-wrap")({
     meta: [
       { title: "Wraparound cover build - internal tool" },
       { name: "description", content: "Internal tool to emit the KDP wraparound cover PDF." },
+      { property: "og:title", content: "Wraparound cover build - internal tool" },
+      { property: "og:description", content: "Internal tool to emit the KDP wraparound cover PDF." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
       { name: "robots", content: "noindex" },
     ],
   }),
