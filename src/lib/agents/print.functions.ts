@@ -138,17 +138,17 @@ export const buildPrintPdf = createServerFn({ method: "POST" })
 
     const latinBytes = await loadFont(FONT_URLS.latin);
     const latinBoldBytes = await loadFont(FONT_URLS.latinBold);
-    const devaBytes = await loadFont(FONT_URLS.devanagari);
-    const shaper = fontkit.create(new Uint8Array(devaBytes));
-    const emScale = (size: number) => size / shaper.unitsPerEm;
-    const measureDeva = (text: string, size: number) =>
-      shaper.layout(text).advanceWidth * emScale(size);
 
     let smallestImagePx = Infinity;
     let embeddedImages = 0;
 
     /** One fully-configured document with the same fonts + helpers. */
-    async function makeDoc() {
+    async function makeDoc(opts: { devanagariUrl?: string; display?: boolean } = {}) {
+      const devaBytes = await loadFont(opts.devanagariUrl ?? FONT_URLS.devanagari);
+      const shaper = fontkit.create(new Uint8Array(devaBytes));
+      const emScale = (size: number) => size / shaper.unitsPerEm;
+      const measureDeva = (text: string, size: number) =>
+        shaper.layout(text).advanceWidth * emScale(size);
       const doc = await PDFDocument.create();
       doc.registerFontkit(
         fontkit as unknown as Parameters<(typeof doc)["registerFontkit"]>[0],
@@ -157,6 +157,13 @@ export const buildPrintPdf = createServerFn({ method: "POST" })
       const latin = await doc.embedFont(latinBytes, { subset: false });
       const latinBold = await doc.embedFont(latinBoldBytes, { subset: false });
       const deva = await doc.embedFont(devaBytes, { subset: false });
+      const poppins = opts.display
+        ? await doc.embedFont(await loadFont(FONT_URLS.poppins), { subset: false })
+        : latin;
+      const poppinsBold = opts.display
+        ? await doc.embedFont(await loadFont(FONT_URLS.poppinsBold), { subset: false })
+        : latinBold;
+
 
       // Devanagari needs full GSUB/GPOS shaping (matra reordering + mark
       // attachment), so glyphs are positioned individually instead of relying
