@@ -59,7 +59,7 @@ export const CHARACTER_BIBLE: Record<string, string> = {
   Tiger:
     "Cute baby tiger cub Sheru, orange with black stripes, white belly, pink nose, small rounded ears, big amber eyes, same proportions every page, Pixar storybook 2D, soft colors, lush Indian jungle background, no text in image",
   Pangolin:
-    "Cute baby pangolin named Tumbi, warm earth-brown scales with soft olive undertones and paler edges, overlapping like rounded artichoke leaves, pale cream face and scale-free belly, small conical head with a narrow gentle snout, small dark shining friendly eyes, tiny rounded ears, a long heavy tapering scaled tail as long as his body, a long low body carried close to the ground, short sturdy legs with curled-under front claws, walks low on all fours and only rears up on his hind legs to look at something, same proportions every page, Pixar storybook 2D, soft colours, warm African savanna and open woodland background, no text in image",
+    "Cute baby pangolin named Tumbi, storybook character proportions with a noticeably large rounded head and large dark shining friendly eyes on a small body, warm mid earth-brown scales with soft olive undertones and paler edges overlapping like rounded artichoke leaves, pale cream face and scale-free belly, small rounded ears, a narrow gentle snout, a long heavy tapering scaled tail as long as his body, a long low body carried close to the ground, short sturdy legs with curled-under front claws, walks low on all fours and rears up on his hind legs to look at something, exactly the same warm earth-brown colour in every image - never orange, never grey, never green, same proportions every page, Pixar storybook 2D, soft colours, warm African savanna and open woodland background, no text in image",
 };
 
 
