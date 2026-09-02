@@ -1,4 +1,4 @@
-export const REGIONS = ["India", "MENA", "Europe", "USA"] as const;
+export const REGIONS = ["India", "MENA", "Africa", "Europe", "USA"] as const;
 export type Region = (typeof REGIONS)[number];
 
 /**
@@ -24,6 +24,7 @@ export const ANIMALS = [
 export const ANIMALS_BY_REGION: Record<Region, string[]> = {
   India: [...ANIMALS],
   MENA: [...ANIMALS],
+  Africa: [...ANIMALS],
   Europe: [...ANIMALS],
   USA: [...ANIMALS],
 };
@@ -32,6 +33,7 @@ export const ANIMALS_BY_REGION: Record<Region, string[]> = {
 export const LANGUAGE_BY_REGION: Record<Region, { label: string; second: string }> = {
   India: { label: "English + Hindi", second: "Hindi" },
   MENA: { label: "English + Arabic", second: "Arabic" },
+  Africa: { label: "English + Swahili", second: "Swahili" },
   Europe: { label: "English + Spanish", second: "Spanish" },
   USA: { label: "English + Spanish", second: "Spanish" },
 };
@@ -57,7 +59,7 @@ export const CHARACTER_BIBLE: Record<string, string> = {
   Tiger:
     "Cute baby tiger cub Sheru, orange with black stripes, white belly, pink nose, small rounded ears, big amber eyes, same proportions every page, Pixar storybook 2D, soft colors, lush Indian jungle background, no text in image",
   Pangolin:
-    "Cute baby pangolin named Tumbi, warm sandy-gold overlapping scales like small rounded artichoke leaves, soft pale cream belly with no scales, tiny rounded ears, a long tapering scaled tail, small dark shining friendly eyes, a narrow gentle snout, short sturdy legs with curled-under front claws, same proportions every page, Pixar storybook 2D, soft colours, warm African savanna and woodland background, no text in image",
+    "Cute baby pangolin named Tumbi, warm earth-brown scales with soft olive undertones and paler edges, overlapping like rounded artichoke leaves, pale cream face and scale-free belly, small conical head with a narrow gentle snout, small dark shining friendly eyes, tiny rounded ears, a long heavy tapering scaled tail as long as his body, a long low body carried close to the ground, short sturdy legs with curled-under front claws, walks low on all fours and only rears up on his hind legs to look at something, same proportions every page, Pixar storybook 2D, soft colours, warm African savanna and open woodland background, no text in image",
 };
 
 
@@ -113,6 +115,7 @@ export const KDP_VALIDATED_KEY = "mawil-book1-kdp-validated";
 const REGION_SETTING: Record<Region, string> = {
   India: "in Indian jungle",
   MENA: "in a desert oasis",
+  Africa: "in a warm African savanna and open woodland",
   Europe: "in a European forest",
   USA: "in an American national park",
 };

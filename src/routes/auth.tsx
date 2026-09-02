@@ -10,13 +10,13 @@ import { Label } from "@/components/ui/label";
 export const Route = createFileRoute("/auth")({
   head: () => ({
     meta: [
-      { title: "Sign in - Mawil Kids Global Factory" },
+      { title: "Sign in - Little Zoologists" },
       {
         name: "description",
         content:
           "Sign in to the Little Zoologists studio to create and manage your own bilingual kids books securely.",
       },
-      { property: "og:title", content: "Sign in - Mawil Kids Global Factory" },
+      { property: "og:title", content: "Sign in - Little Zoologists" },
       {
         property: "og:description",
         content: "Secure studio access for creating Little Zoologists picture books.",

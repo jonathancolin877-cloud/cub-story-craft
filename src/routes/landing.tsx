@@ -5,13 +5,13 @@ import { BOOK_STORAGE_KEY, type Book } from "@/lib/book-types";
 export const Route = createFileRoute("/landing")({
   head: () => ({
     meta: [
-      { title: "Buy the Book | Mawil Kids Little Zoologists" },
+      { title: "Buy the Book | Little Zoologists" },
       {
         name: "description",
         content:
           "Bilingual English + Hindi picture book for ages 3-5, with real animal facts. Buy now on Amazon.in.",
       },
-      { property: "og:title", content: "Mawil Kids - Little Zoologists picture book" },
+      { property: "og:title", content: "Little Zoologists picture book" },
       {
         property: "og:description",
         content: "Bilingual kids picture book with real zoology facts. Available on Amazon.in.",
@@ -35,7 +35,7 @@ function Landing() {
     }
   }, []);
 
-  const title = book?.title ?? "Little Zoologists of the World";
+  const title = book?.title ?? "Little Zoologists";
   const amazon = `https://www.amazon.in/s?k=${encodeURIComponent(title)}`;
 
   return (
@@ -51,7 +51,7 @@ function Landing() {
           </div>
           <div>
             <p className="text-sm font-bold tracking-widest uppercase opacity-90">
-              Mawil Kids Global Factory
+              Little Zoologists
             </p>
             <h1 className="mt-2 text-4xl font-extrabold">{title}</h1>
             {book ? <p className="mt-1 text-2xl font-bold">{book.titleTranslated}</p> : null}

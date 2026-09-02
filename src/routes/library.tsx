@@ -8,13 +8,13 @@ import { STATUS_LABEL, type BookStatus } from "@/lib/book-types";
 export const Route = createFileRoute("/library")({
   head: () => ({
     meta: [
-      { title: "Book Library - Mawil Kids Global Factory" },
+      { title: "Book Library - Little Zoologists" },
       {
         name: "description",
         content:
           "Every Little Zoologists picture book in one place - live titles first, with book numbers and production status.",
       },
-      { property: "og:title", content: "Book Library - Little Zoologists of the World" },
+      { property: "og:title", content: "Book Library - Little Zoologists" },
       {
         property: "og:description",
         content: "Browse all bilingual kids books, sorted with live titles first.",
@@ -59,7 +59,7 @@ function LibraryPage() {
         <div className="mx-auto flex max-w-[1200px] items-center justify-between gap-3 px-5 py-6">
           <div>
             <h1 className="text-2xl font-extrabold">Book Library</h1>
-            <p className="text-sm opacity-90">Live titles first · Little Zoologists of the World</p>
+            <p className="text-sm opacity-90">Live titles first · Little Zoologists</p>
           </div>
           <Link
             to="/"
