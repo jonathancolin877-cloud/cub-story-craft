@@ -45,7 +45,15 @@ import {
 import { exportReels, exportYoutubeScript } from "@/lib/exports";
 import { agents, type KdpReport } from "@/agents/client";
 import type { PrintFile } from "@/lib/agents/layout-agent";
+import { editionFromBook } from "@/lib/agents/layout-agent";
 import { fetchLastBook, saveArtwork, upsertBook } from "@/lib/book-store";
+import {
+  createEdition,
+  fetchEditions,
+  markEditionExported,
+  setEditionReviewed,
+} from "@/lib/editions-store";
+import { LOCALES, LOCALE_CODES, localeDef, type BookEdition } from "@/lib/locales";
 import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/")({
@@ -87,6 +95,65 @@ function Studio() {
     cover: PrintFile;
     wraparound: PrintFile;
   } | null>(null);
+
+  /* ---- Editions: one book master, N monolingual language editions ---- */
+  const [editions, setEditions] = useState<BookEdition[]>([]);
+  const [activeLocale, setActiveLocale] = useState<string>("en");
+  const [newLocale, setNewLocale] = useState<string>("ar");
+  const [editionBusy, setEditionBusy] = useState(false);
+
+  const activeEdition = useMemo<BookEdition | null>(() => {
+    const hit = editions.find((e) => e.locale === activeLocale);
+    if (hit) return hit;
+    return book ? editionFromBook(book) : null;
+  }, [editions, activeLocale, book]);
+
+  const loadEditions = async (id: string) => {
+    const rows = await fetchEditions(id);
+    setEditions(rows);
+    if (rows.length && !rows.some((e) => e.locale === activeLocale)) {
+      setActiveLocale(rows[0]!.locale);
+    }
+  };
+
+  useEffect(() => {
+    if (!bookId) return;
+    void fetchEditions(bookId).then((rows) => {
+      setEditions(rows);
+      setActiveLocale((cur) =>
+        rows.some((e) => e.locale === cur) ? cur : (rows[0]?.locale ?? "en"),
+      );
+    });
+  }, [bookId]);
+
+  async function onAddEdition() {
+    if (!book || !bookId) {
+      toast.error("Save the book first");
+      return;
+    }
+    setEditionBusy(true);
+    try {
+      const created = await createEdition(bookId, book, newLocale);
+      await loadEditions(bookId);
+      setActiveLocale(created.locale);
+      toast.success(
+        `${localeDef(created.locale).label} edition created - empty and marked unreviewed. Paste the translated text in, then mark it reviewed.`,
+      );
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not create the edition");
+    } finally {
+      setEditionBusy(false);
+    }
+  }
+
+  async function onToggleReviewed(edition: BookEdition) {
+    try {
+      await setEditionReviewed(edition.id, edition.reviewStatus !== "reviewed");
+      if (bookId) await loadEditions(bookId);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not update the edition");
+    }
+  }
 
   useEffect(() => {
     try {
@@ -141,6 +208,17 @@ function Studio() {
       toast.error("Generate a book first");
       return;
     }
+    const edition = activeEdition;
+    if (!edition) {
+      toast.error("Pick a language edition first");
+      return;
+    }
+    if (edition.pages.some((p) => !p.text.trim())) {
+      toast.error(
+        `The ${localeDef(edition.locale).label} edition still has empty pages - fill the text before exporting.`,
+      );
+      return;
+    }
     if (!book.coverImage || book.pages.some((p) => !p.image)) {
       toast("Exporting with current images");
     }
@@ -148,21 +226,32 @@ function Studio() {
     setPrintFiles(null);
     try {
       setPrinting("Preparing 2625px art...");
-      const layout = await agents.layout(book, (done, total) =>
+      const layout = await agents.layout(book, edition, (done, total) =>
         setPrinting(`Uploading print art ${done}/${total}...`),
       );
       setPrinting("Validating print files...");
-      const report = await agents.validate(book, layout);
+      const report = await agents.validate(book, edition, layout);
       setKdpReport(report);
       setPrintFiles({
         interior: layout.interior,
         cover: layout.cover,
         wraparound: layout.wraparound,
       });
-      if (report.pass) toast.success("Interior + cover PDFs built and validated");
+      if (edition.id !== "local-en") {
+        await markEditionExported(edition.id, {
+          interior: layout.interior.path,
+          cover: layout.cover.path,
+          wraparound: layout.wraparound.path,
+          pass: report.pass,
+          blocksPublish: report.blocksPublish,
+        });
+        if (bookId) await loadEditions(bookId);
+      }
+      const label = localeDef(edition.locale).label;
+      if (report.pass) toast.success(`${label} edition built and validated`);
       else if (!report.blocksPublish)
-        toast.warning("Interior + cover PDFs built - passed with warnings, see report");
-      else toast.error("PDF exported but KDP validation failed - see report");
+        toast.warning(`${label} edition built - passed with warnings, see report`);
+      else toast.error(`${label} edition exported but KDP validation failed - see report`);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "PDF export failed");
     } finally {
@@ -337,6 +426,9 @@ function Studio() {
     return () => sub.subscription.unsubscribe();
   }, []);
 
+  const editionDir = activeEdition?.direction === "rtl" ? "rtl" : "ltr";
+  const editionText = (pageNo: number) => activeEdition?.pages.find((p) => p.page === pageNo);
+
   const chapter = useMemo(
     () => (n: number) =>
       n <= 3 ? "Intro" : n <= 18 ? "Challenge" : n <= 22 ? "Lesson" : "Moral",
@@ -445,9 +537,10 @@ function Studio() {
               </Select>
             </Field>
 
-            <Field label="Language (auto dual)">
+            <Field label="Master language">
               <div className="flex items-center gap-2 rounded-xl border border-border bg-muted px-3 py-2 text-sm font-semibold">
-                <Globe2 className="h-4 w-4 text-primary" /> {language.label}
+                <Globe2 className="h-4 w-4 text-primary" /> English master · {language.second}{" "}
+                edition suggested
               </div>
             </Field>
 
@@ -569,6 +662,109 @@ function Studio() {
 
         {/* MIDDLE: preview */}
         <section className="card-soft rounded-3xl border border-border bg-card p-5">
+          {/* EDITION SWITCHER - one master, N monolingual editions */}
+          {book ? (
+            <div className="mb-4 rounded-2xl border border-border bg-background p-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs font-bold tracking-wide text-primary uppercase">
+                  Editions
+                </span>
+                {editions.length === 0 ? (
+                  <span className="text-xs text-muted-foreground">
+                    None saved yet - the English master is shown.
+                  </span>
+                ) : null}
+                {editions.map((e) => {
+                  const def = localeDef(e.locale);
+                  const on = e.locale === activeLocale;
+                  return (
+                    <button
+                      key={e.id}
+                      type="button"
+                      onClick={() => setActiveLocale(e.locale)}
+                      className={`cursor-pointer rounded-full border px-3 py-1 text-xs font-bold transition-colors ${
+                        on
+                          ? "border-primary bg-primary text-primary-foreground"
+                          : "border-border bg-card hover:bg-secondary"
+                      }`}
+                    >
+                      {def.label} · {e.locale}
+                      {def.direction === "rtl" ? " · RTL" : ""}
+                      {e.exportedAt ? " ✓" : ""}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {activeEdition ? (
+                <div className="mt-3 flex flex-wrap items-center gap-3 text-xs">
+                  <span className="text-muted-foreground">
+                    {localeDef(activeEdition.locale).endonym} · {localeDef(activeEdition.locale).market}{" "}
+                    · {activeEdition.direction === "rtl" ? "right-to-left" : "left-to-right"} ·{" "}
+                    {activeEdition.pages.filter((p) => p.text.trim()).length}/
+                    {activeEdition.pages.length} pages written
+                  </span>
+                  {activeEdition.reviewStatus === "unreviewed" ? (
+                    <span className="rounded-full bg-destructive px-2 py-0.5 font-bold text-destructive-foreground">
+                      UNREVIEWED TRANSLATION
+                    </span>
+                  ) : (
+                    <span className="rounded-full bg-primary px-2 py-0.5 font-bold text-primary-foreground">
+                      REVIEWED
+                    </span>
+                  )}
+                  {activeEdition.id !== "local-en" ? (
+                    <button
+                      type="button"
+                      className="cursor-pointer font-bold underline"
+                      onClick={() => void onToggleReviewed(activeEdition)}
+                    >
+                      {activeEdition.reviewStatus === "reviewed"
+                        ? "Mark unreviewed"
+                        : "Mark reviewed"}
+                    </button>
+                  ) : null}
+                  {activeEdition.exportedAt ? (
+                    <span className="text-muted-foreground">
+                      exported {new Date(activeEdition.exportedAt).toLocaleDateString()}
+                    </span>
+                  ) : (
+                    <span className="text-muted-foreground">not exported yet</span>
+                  )}
+                </div>
+              ) : null}
+
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <Select value={newLocale} onValueChange={setNewLocale}>
+                  <SelectTrigger className="h-9 w-[220px] rounded-xl text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {LOCALE_CODES.filter((c) => !editions.some((e) => e.locale === c)).map((c) => (
+                      <SelectItem key={c} value={c}>
+                        {LOCALES[c]!.label} ({LOCALES[c]!.endonym}) ·{" "}
+                        {LOCALES[c]!.direction.toUpperCase()}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  variant="secondary"
+                  className="h-9 rounded-xl text-xs font-bold"
+                  disabled={!bookId || editionBusy}
+                  onClick={() => void onAddEdition()}
+                >
+                  {editionBusy ? (
+                    <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Globe2 className="mr-2 h-3.5 w-3.5" />
+                  )}
+                  Add edition
+                </Button>
+              </div>
+            </div>
+          ) : null}
+
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <h2 className="flex items-center gap-2 text-lg font-extrabold">
               <BookOpen className="h-5 w-5 text-primary" /> Book Preview
@@ -628,13 +824,16 @@ function Studio() {
                     <div className="grid h-full place-items-center text-4xl">📕</div>
                   )}
                 </div>
-                <div className="min-w-0">
-                  <p className="text-xs font-bold tracking-wide text-primary uppercase">Cover</p>
-                  <h3 className="text-2xl font-extrabold">{book.title}</h3>
-                  <p className="script-line text-lg font-semibold text-secondary-foreground">
-                    {book.titleTranslated}
+                <div className="min-w-0" dir={editionDir}>
+                  <p className="text-xs font-bold tracking-wide text-primary uppercase">
+                    Cover · {localeDef(activeLocale).label}
                   </p>
-                  <p className="mt-2 text-sm text-muted-foreground">{book.blurb}</p>
+                  <h3 className="script-line text-2xl font-extrabold">
+                    {activeEdition?.title || book.title}
+                  </h3>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    {activeEdition?.blurb || book.blurb}
+                  </p>
                 </div>
               </div>
 
@@ -664,11 +863,16 @@ function Studio() {
                         {chapter(p.page)}
                       </span>
                     </div>
-                    <div className="space-y-2 p-3">
-                      <p className="font-bold">{p.en}</p>
-                      <p className="script-line text-primary">{p.translated}</p>
+                    <div className="space-y-2 p-3" dir={editionDir}>
+                      <p className="script-line font-bold">
+                        {editionText(p.page)?.text || (
+                          <span className="text-destructive">
+                            (no {localeDef(activeLocale).label} text yet)
+                          </span>
+                        )}
+                      </p>
                       <p className="rounded-xl bg-secondary p-2 text-xs text-secondary-foreground">
-                        🔎 <strong>Fact:</strong> {p.fact}
+                        🔎 <strong>Fact:</strong> {editionText(p.page)?.fact || p.fact}
                       </p>
                     </div>
                   </article>
@@ -747,6 +951,12 @@ function Studio() {
               <p className="font-bold">
                 KDP validator: {kdpReport.pass ? "PASS" : kdpReport.blocksPublish ? "FAIL - publish blocked" : "PASS with warnings"}
               </p>
+              <p className="text-muted-foreground">
+                Edition {localeDef(kdpReport.locale ?? activeLocale).label} ·{" "}
+                {kdpReport.locale ?? activeLocale} ·{" "}
+                {(kdpReport.direction ?? "ltr") === "rtl" ? "right-to-left" : "left-to-right"}
+              </p>
+
               {kdpReport.checks.map((c) => (
                 <div
                   key={c.id}

@@ -1,4 +1,5 @@
 import { PRINT_SPEC, type Book } from "@/lib/book-types";
+import { localeDef, type BookEdition, type Direction, type ScriptKey } from "@/lib/locales";
 import { supabase } from "@/integrations/supabase/client";
 import { buildPrintPdf, buildWraparoundCover } from "./print.functions";
 
@@ -6,7 +7,8 @@ import { buildPrintPdf, buildWraparoundCover } from "./print.functions";
  * LAYOUT AGENT (client half)
  * Prepares print assets - every illustration upscaled to a 2625x2625 square
  * JPEG (8.75in incl. 0.125in bleed @ 300 DPI) - uploads them to private
- * storage, then asks the server print agent to emit the real PDF/X-1a file.
+ * storage, then asks the server print agent to emit the real PDF for ONE
+ * edition (one language per file).
  */
 export type PrintFile = {
   filename: string;
@@ -19,6 +21,17 @@ export type PrintFile = {
 
 export const SERIES_LINE = "Mawil Kids Global Factory - Little Zoologists of the World";
 
+/** "Did you know?" per locale - the fact-box label, not the fact itself. */
+const FACT_LABEL: Record<string, string> = {
+  en: "Did you know?",
+  hi: "क्या आप जानते हैं?",
+  ar: "هل تعلم؟",
+  es: "¿Sabías que?",
+  fr: "Le savais-tu ?",
+  de: "Wusstest du?",
+  pt: "Você sabia?",
+};
+
 export type LayoutResult = {
   interior: PrintFile;
   cover: PrintFile;
@@ -26,6 +39,9 @@ export type LayoutResult = {
   wraparound: PrintFile;
   /** Kept for callers that still want a single "the PDF" handle (the interior). */
   path: string;
+  locale: string;
+  direction: Direction;
+  script: ScriptKey;
   meta: {
     pageSizeIn: number;
     trimIn: number;
@@ -34,6 +50,7 @@ export type LayoutResult = {
     imagePx: number;
     trueSourcePx: number;
     coverNativePx: number;
+    interiorImageIn: number;
   };
 };
 
@@ -77,19 +94,41 @@ async function printJpeg(
   return blob ? { blob, px: out } : null;
 }
 
-
+/** Fall back to the master book's English text when an edition is missing. */
+export function editionFromBook(book: Book): BookEdition {
+  return {
+    id: "local-en",
+    bookId: "",
+    locale: "en",
+    languageLabel: "English",
+    direction: "ltr",
+    script: "latin",
+    title: book.title,
+    blurb: book.blurb,
+    affirmation: book.affirmationEn ?? "",
+    pages: book.pages.map((p) => ({ page: p.page, text: p.en, fact: p.fact })),
+    reviewStatus: "reviewed",
+    exportedAt: null,
+    updatedAt: new Date().toISOString(),
+  };
+}
 
 export async function layoutAgent(
   book: Book,
+  edition: BookEdition,
   onProgress?: (done: number, total: number) => void,
 ): Promise<LayoutResult> {
   const { data: sessionData } = await supabase.auth.getSession();
   const uid = sessionData.session?.user.id;
   if (!uid) throw new Error("Sign in to build the print-ready PDF");
 
+  const def = localeDef(edition.locale);
+  const direction = edition.direction ?? def.direction;
+  const script = edition.script ?? def.script;
+
   smallestTrueSourcePx = Infinity;
   coverNativePx = 0;
-  const jobId = `${slug(book.title)}-${Date.now()}`;
+  const jobId = `${slug(book.title)}-${edition.locale}-${Date.now()}`;
   const bucket = supabase.storage.from("print-assets");
   const total = book.pages.length + 1;
   let done = 0;
@@ -114,25 +153,34 @@ export async function layoutAgent(
   const coverUp = await upload(book.coverImage, "cover", 0);
   const coverPath = coverUp?.path;
   coverNativePx = coverUp?.px ?? 0;
-  const pages: { page: number; en: string; translated: string; fact: string; path?: string }[] = [];
+
+  const textFor = (pageNo: number) => edition.pages.find((p) => p.page === pageNo);
+  const pages: { page: number; text: string; fact: string; path?: string }[] = [];
   for (const p of book.pages) {
     const up = await upload(p.image, `p${String(p.page).padStart(2, "0")}`);
+    const t = textFor(p.page);
     pages.push({
       page: p.page,
-      en: p.en,
-      translated: p.translated,
-      fact: p.fact,
+      text: t?.text ?? p.en,
+      fact: t?.fact ?? p.fact,
       ...(up ? { path: up.path } : {}),
     });
   }
 
   const trueSourcePx = Number.isFinite(smallestTrueSourcePx) ? smallestTrueSourcePx : 0;
+  const localeArgs = {
+    locale: edition.locale,
+    direction,
+    script,
+    seriesLine: SERIES_LINE,
+  };
 
   const result = await buildPrintPdf({
     data: {
       jobId,
-      title: book.title,
-      titleTranslated: book.titleTranslated,
+      ...localeArgs,
+      factLabel: FACT_LABEL[edition.locale] ?? "Did you know?",
+      title: edition.title || book.title,
       ...(coverPath ? { coverPath } : {}),
       trueSourcePx,
       coverNativePx,
@@ -140,8 +188,7 @@ export async function layoutAgent(
     },
   });
 
-
-  const base = slug(book.title);
+  const base = `${slug(book.title)}-${edition.locale}`;
   const file = (
     part: { path: string; url: string; bytes: number; pageCount: number },
     filename: string,
@@ -160,15 +207,12 @@ export async function layoutAgent(
   const wrap = await buildWraparoundCover({
     data: {
       jobId,
-      title: book.title,
-      titleTranslated: book.titleTranslated,
+      ...localeArgs,
+      title: edition.title || book.title,
       coverPath: coverPath ?? "",
       coverNativePx,
-      blurbEn: book.blurb,
-      blurbHi: book.blurbTranslated ?? "",
-      affirmationEn: book.affirmationEn ?? "",
-      affirmationHi: book.affirmationTranslated ?? "",
-      seriesLine: SERIES_LINE,
+      blurb: edition.blurb,
+      affirmation: edition.affirmation,
     },
   });
 
@@ -178,6 +222,9 @@ export async function layoutAgent(
     cover: file(result.cover, `${base}-kdp-cover-8.5x8.5.pdf`),
     wraparound: file(wrap, `${base}-kdp-cover-wraparound-17.304x8.75.pdf`),
     path: interior.path,
+    locale: edition.locale,
+    direction,
+    script,
     meta: {
       pageSizeIn: PRINT_SPEC.trimIn + PRINT_SPEC.bleedIn * 2,
       trimIn: PRINT_SPEC.trimIn,
@@ -186,6 +233,7 @@ export async function layoutAgent(
       imagePx: PRINT_SPEC.printPx,
       trueSourcePx,
       coverNativePx,
+      interiorImageIn: result.interiorImageIn,
     },
   };
 }
@@ -194,7 +242,7 @@ export async function layoutAgent(
  * Rebuild ONLY the cover PDF (native-resolution panel layout) into an existing
  * job folder. The interior PDF in that folder is never read or rewritten.
  */
-export async function rebuildCover(book: Book, jobId: string) {
+export async function rebuildCover(book: Book, jobId: string, edition: BookEdition) {
   const { data: sessionData } = await supabase.auth.getSession();
   const uid = sessionData.session?.user.id;
   if (!uid) throw new Error("Sign in to build the print-ready PDF");
@@ -208,18 +256,21 @@ export async function rebuildCover(book: Book, jobId: string) {
     .upload(coverPath, encoded.blob, { contentType: "image/jpeg", upsert: true });
   if (error) throw new Error(`Upload failed: ${error.message}`);
 
+  const def = localeDef(edition.locale);
   const result = await buildPrintPdf({
     data: {
       jobId,
-      title: book.title,
-      titleTranslated: book.titleTranslated,
+      locale: edition.locale,
+      direction: edition.direction ?? def.direction,
+      script: edition.script ?? def.script,
+      seriesLine: SERIES_LINE,
+      factLabel: FACT_LABEL[edition.locale] ?? "Did you know?",
+      title: edition.title || book.title,
       coverPath,
       coverNativePx: encoded.px,
       coverOnly: true,
-      pages: [{ page: 1, en: "", translated: "", fact: "" }],
+      pages: [{ page: 1, text: "", fact: "" }],
     },
   });
   return { cover: result.cover, coverNativePx: encoded.px };
 }
-
-
