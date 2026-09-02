@@ -1,12 +1,33 @@
 export const REGIONS = ["India", "MENA", "Europe", "USA"] as const;
 export type Region = (typeof REGIONS)[number];
 
+/**
+ * The series is global: every animal is selectable in every region.
+ * Region stays a setting (background, culture), never a filter.
+ */
+export const ANIMALS = [
+  "Tiger",
+  "Pangolin",
+  "Elephant",
+  "Peacock",
+  "Oryx",
+  "Falcon",
+  "Gazelle",
+  "Fox",
+  "Bear",
+  "Wolf",
+  "Eagle",
+  "Bison",
+] as const;
+
+/** Kept for compatibility - the same global list for every region. */
 export const ANIMALS_BY_REGION: Record<Region, string[]> = {
-  India: ["Tiger", "Elephant", "Peacock"],
-  MENA: ["Oryx", "Falcon", "Gazelle"],
-  Europe: ["Fox", "Bear", "Wolf"],
-  USA: ["Eagle", "Bison", "Wolf"],
+  India: [...ANIMALS],
+  MENA: [...ANIMALS],
+  Europe: [...ANIMALS],
+  USA: [...ANIMALS],
 };
+
 
 export const LANGUAGE_BY_REGION: Record<Region, { label: string; second: string }> = {
   India: { label: "English + Hindi", second: "Hindi" },
