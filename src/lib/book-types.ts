@@ -56,6 +56,8 @@ export const STYLE_BASE =
 export const CHARACTER_BIBLE: Record<string, string> = {
   Tiger:
     "Cute baby tiger cub Sheru, orange with black stripes, white belly, pink nose, small rounded ears, big amber eyes, same proportions every page, Pixar storybook 2D, soft colors, lush Indian jungle background, no text in image",
+  Pangolin:
+    "Cute baby pangolin named Tumbi, warm sandy-gold overlapping scales like small rounded artichoke leaves, soft pale cream belly with no scales, tiny rounded ears, a long tapering scaled tail, small dark shining friendly eyes, a narrow gentle snout, short sturdy legs with curled-under front claws, same proportions every page, Pixar storybook 2D, soft colours, warm African savanna and woodland background, no text in image",
 };
 
 
