@@ -426,6 +426,9 @@ function Studio() {
     return () => sub.subscription.unsubscribe();
   }, []);
 
+  const editionDir = activeEdition?.direction === "rtl" ? "rtl" : "ltr";
+  const editionText = (pageNo: number) => activeEdition?.pages.find((p) => p.page === pageNo);
+
   const chapter = useMemo(
     () => (n: number) =>
       n <= 3 ? "Intro" : n <= 18 ? "Challenge" : n <= 22 ? "Lesson" : "Moral",
@@ -821,13 +824,16 @@ function Studio() {
                     <div className="grid h-full place-items-center text-4xl">📕</div>
                   )}
                 </div>
-                <div className="min-w-0">
-                  <p className="text-xs font-bold tracking-wide text-primary uppercase">Cover</p>
-                  <h3 className="text-2xl font-extrabold">{book.title}</h3>
-                  <p className="script-line text-lg font-semibold text-secondary-foreground">
-                    {book.titleTranslated}
+                <div className="min-w-0" dir={editionDir}>
+                  <p className="text-xs font-bold tracking-wide text-primary uppercase">
+                    Cover · {localeDef(activeLocale).label}
                   </p>
-                  <p className="mt-2 text-sm text-muted-foreground">{book.blurb}</p>
+                  <h3 className="script-line text-2xl font-extrabold">
+                    {activeEdition?.title || book.title}
+                  </h3>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    {activeEdition?.blurb || book.blurb}
+                  </p>
                 </div>
               </div>
 
@@ -857,11 +863,16 @@ function Studio() {
                         {chapter(p.page)}
                       </span>
                     </div>
-                    <div className="space-y-2 p-3">
-                      <p className="font-bold">{p.en}</p>
-                      <p className="script-line text-primary">{p.translated}</p>
+                    <div className="space-y-2 p-3" dir={editionDir}>
+                      <p className="script-line font-bold">
+                        {editionText(p.page)?.text || (
+                          <span className="text-destructive">
+                            (no {localeDef(activeLocale).label} text yet)
+                          </span>
+                        )}
+                      </p>
                       <p className="rounded-xl bg-secondary p-2 text-xs text-secondary-foreground">
-                        🔎 <strong>Fact:</strong> {p.fact}
+                        🔎 <strong>Fact:</strong> {editionText(p.page)?.fact || p.fact}
                       </p>
                     </div>
                   </article>
