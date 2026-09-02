@@ -271,8 +271,6 @@ export async function rebuildCover(book: Book, jobId: string, edition: BookEditi
       seriesLine: SERIES_LINE,
       author: BOOK_AUTHOR,
       publisher: PUBLISHER,
-    author: BOOK_AUTHOR,
-    publisher: PUBLISHER,
       factLabel: FACT_LABEL[edition.locale] ?? "Did you know?",
       title: edition.title || book.title,
       coverPath,
