@@ -39,7 +39,9 @@ export const generateCharacterSheet = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const prompt = [
       data.characterBible,
+      data.characterSheet ? `Character details (must all be visible): ${data.characterSheet}` : "",
       `Character turnaround model sheet for ${data.characterName || "the character"}:`,
+
       "exactly three full-body poses of the SAME character side by side in one row -",
       "front view on the left, three-quarter view in the middle, side profile on the right.",
       "Plain flat light-grey studio background, no scenery, no props, no text, no labels, no border.",
