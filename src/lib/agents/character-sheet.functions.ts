@@ -14,8 +14,11 @@ const ART_BUCKET = "book-art";
 const Input = z.object({
   bookId: z.string().min(1),
   characterBible: z.string().min(3),
+  /** Book-specific look notes (markings, accessory, expression) - drawn onto the sheet. */
+  characterSheet: z.string().optional(),
   characterName: z.string().optional(),
 });
+
 
 function apiKey() {
   const k = process.env["LOVABLE_API_KEY"];
