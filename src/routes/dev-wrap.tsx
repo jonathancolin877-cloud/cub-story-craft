@@ -42,7 +42,7 @@ function DevWrap() {
             "नन्हे बाघ शेरू के साथ चलिए, जो अपने डर का सामना करता है और सीखता है कि बहादुर होने का मतलब है पूरी कोशिश करना!",
           affirmationEn: "I am brave like Sheru",
           affirmationHi: "मैं शेरू की तरह बहादुर हूँ",
-          seriesLine: "Mawil Kids Global Factory - Little Zoologists of the World",
+          seriesLine: "Little Zoologists",
         },
       });
       const report = await validate({ data: { path: res.path, coverNativePx: 1024 } });

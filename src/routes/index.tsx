@@ -59,13 +59,13 @@ import { supabase } from "@/integrations/supabase/client";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Mawil Kids Global Factory - Little Zoologists of the World" },
+      { title: "Little Zoologists - bilingual kids book studio" },
       {
         name: "description",
         content:
           "Generate a 24-page bilingual kids picture book, KDP-ready PDF, YouTube script and Instagram reels from one animal and region.",
       },
-      { property: "og:title", content: "Mawil Kids Global Factory - Little Zoologists" },
+      { property: "og:title", content: "Little Zoologists" },
       {
         property: "og:description",
         content: "One animal + one region = a complete kids book package ready for Amazon and YouTube.",
@@ -444,8 +444,8 @@ function Studio() {
               🐯
             </span>
             <div>
-              <h1 className="text-2xl leading-tight font-extrabold">Mawil Kids Global Factory</h1>
-              <p className="text-sm opacity-90">Little Zoologists of the World</p>
+              <h1 className="text-2xl leading-tight font-extrabold">Little Zoologists</h1>
+              <p className="text-sm opacity-90">Bilingual picture books with real animal facts</p>
             </div>
           </div>
           <div className="flex items-center gap-2">

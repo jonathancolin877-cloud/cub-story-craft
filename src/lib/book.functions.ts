@@ -27,7 +27,7 @@ async function gatewayError(res: Response) {
 export const generateBook = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => GenerateInput.parse(d))
   .handler(async ({ data }) => {
-    const prompt = `You are a children's picture-book author for Mawil Kids Global Factory.
+    const prompt = `You are a children's picture-book author for the Little Zoologists series.
 Create a complete 24-page picture book.
 
 Region: ${data.region}

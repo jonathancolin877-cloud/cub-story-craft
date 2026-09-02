@@ -19,7 +19,10 @@ export type PrintFile = {
   save: () => void;
 };
 
-export const SERIES_LINE = "Mawil Kids Global Factory - Little Zoologists of the World";
+export const SERIES_LINE = "Little Zoologists";
+export const BOOK_AUTHOR = "Nathan Col";
+/** Legal publisher - copyright/imprint line only, never marketing or covers. */
+export const PUBLISHER = "Mawil";
 
 /** "Did you know?" per locale - the fact-box label, not the fact itself. */
 const FACT_LABEL: Record<string, string> = {
@@ -173,6 +176,8 @@ export async function layoutAgent(
     direction,
     script,
     seriesLine: SERIES_LINE,
+    author: BOOK_AUTHOR,
+    publisher: PUBLISHER,
   };
 
   const result = await buildPrintPdf({
@@ -264,6 +269,10 @@ export async function rebuildCover(book: Book, jobId: string, edition: BookEditi
       direction: edition.direction ?? def.direction,
       script: edition.script ?? def.script,
       seriesLine: SERIES_LINE,
+      author: BOOK_AUTHOR,
+      publisher: PUBLISHER,
+    author: BOOK_AUTHOR,
+    publisher: PUBLISHER,
       factLabel: FACT_LABEL[edition.locale] ?? "Did you know?",
       title: edition.title || book.title,
       coverPath,

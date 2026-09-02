@@ -131,7 +131,9 @@ const Input = z.object({
   jobId: z.string().min(3),
   ...LocaleInput,
   title: z.string(),
-  seriesLine: z.string().default("Mawil Kids Global Factory"),
+  seriesLine: z.string().default("Little Zoologists"),
+  author: z.string().default("Nathan Col"),
+  publisher: z.string().default("Mawil"),
   factLabel: z.string().default("Did you know?"),
   coverPath: z.string().optional(),
   /** True generated pixel size of the illustrations before any upscale. */
@@ -399,9 +401,9 @@ export const buildPrintPdf = createServerFn({ method: "POST" })
 
       const finish = async () => {
         doc.setTitle(`${data.title} (${data.locale})`);
-        doc.setAuthor("Mawil Kids Global Factory");
-        doc.setCreator("Mawil Print Agent");
-        doc.setProducer("Mawil Print Agent (pdf-lib)");
+        doc.setAuthor(data.author);
+        doc.setCreator(data.publisher);
+        doc.setProducer(`${data.publisher} (pdf-lib)`);
         doc.setLanguage(data.locale);
         if (dir === "rtl") {
           // Declares right-to-left reading intent. Physical binding side is a
@@ -765,6 +767,8 @@ const WrapInput = z.object({
   blurb: z.string(),
   affirmation: z.string(),
   seriesLine: z.string(),
+  author: z.string().default("Nathan Col"),
+  publisher: z.string().default("Mawil"),
 });
 
 export const buildWraparoundCover = createServerFn({ method: "POST" })
@@ -934,6 +938,17 @@ export const buildWraparoundCover = createServerFn({ method: "POST" })
       );
     }
     // Series line: centred in the area LEFT of the blank barcode reserve.
+    // Imprint / copyright line - legal publisher only, never on the front cover.
+    centre(
+      latin,
+      [`(c) ${new Date().getFullYear()} ${data.author}. Published by ${data.publisher}.`],
+      8,
+      (backSafeX0 + barcodeX0) / 2,
+      safeBottom + 14,
+      INK,
+      1.4,
+      "ltr",
+    );
     centre(latin, [data.seriesLine], 9, (backSafeX0 + barcodeX0) / 2, safeBottom + 2, INK, 1.4, "ltr");
 
     // ---------------- SPINE (blank white, no text) ----------------
@@ -967,9 +982,9 @@ export const buildWraparoundCover = createServerFn({ method: "POST" })
     centre(latin, [data.seriesLine], 10, frontCx, safeBottom + 6, INK, 1.4, "ltr");
 
     doc.setTitle(`${data.title} - KDP wraparound cover (${data.locale})`);
-    doc.setAuthor("Mawil Kids Global Factory");
-    doc.setCreator("Mawil Print Agent");
-    doc.setProducer("Mawil Print Agent (pdf-lib)");
+    doc.setAuthor(data.author);
+    doc.setCreator(data.publisher);
+    doc.setProducer(`${data.publisher} (pdf-lib)`);
     doc.setLanguage(data.locale);
     if (dir === "rtl") {
       doc.catalog.set(
