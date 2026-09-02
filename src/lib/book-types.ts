@@ -63,8 +63,13 @@ export type Book = {
   titleTranslated: string;
   characterName: string;
   characterSheet: string;
+  /** Storage path of the approved character reference sheet (book-art bucket). */
+  characterSheetPath?: string | undefined;
+  /** Displayable (signed or data) URL for that reference sheet. */
+  characterSheetImage?: string | undefined;
   animal: string;
   region: Region;
+
   value: string;
   age: string;
   secondLanguage: string;

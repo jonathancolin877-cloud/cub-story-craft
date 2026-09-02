@@ -126,8 +126,10 @@ type Row = {
   meta: unknown;
   status?: BookStatus | null;
   book_number?: number | null;
+  character_sheet_image?: string | null;
   updated_at: string;
 };
+
 
 /** Turn stored artwork paths into temporary signed URLs the browser can render. */
 async function signArt(paths: (string | null | undefined)[]) {
@@ -147,7 +149,8 @@ async function toBook(data: Row): Promise<Book> {
   const meta = (data.meta ?? {}) as Record<string, string>;
   const images = (data.images ?? {}) as ImagesJson;
   const rawPages = (data.pages ?? []) as BookPage[];
-  const resolve = await signArt([images.cover, ...(images.pages ?? [])]);
+  const sheetPath = data.character_sheet_image ?? undefined;
+  const resolve = await signArt([images.cover, ...(images.pages ?? []), sheetPath]);
 
   return {
     status: (data.status ?? "draft") as BookStatus,
@@ -156,7 +159,10 @@ async function toBook(data: Row): Promise<Book> {
     titleTranslated: meta["titleTranslated"] ?? "",
     characterName: meta["characterName"] ?? "",
     characterSheet: meta["characterSheet"] ?? "",
+    characterSheetPath: sheetPath,
+    characterSheetImage: resolve(sheetPath),
     animal: data.animal,
+
     region: data.region as Region,
     value: meta["value"] ?? "",
     age: meta["age"] ?? "",

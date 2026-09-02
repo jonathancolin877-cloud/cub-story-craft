@@ -1,5 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+
 
 /**
  * ILLUSTRATOR AGENT
@@ -22,7 +24,10 @@ const Input = z.object({
   characterBible: z.string().optional(),
   characterSheet: z.string().optional(),
   bookId: z.string().optional(),
+  /** Storage path (book-art bucket) of the approved character sheet image. */
+  referencePath: z.string().optional(),
 });
+
 
 function apiKey() {
   const k = process.env["LOVABLE_API_KEY"];
@@ -76,8 +81,9 @@ function imageSize(bytes: Uint8Array): { width: number; height: number } {
 }
 
 export const illustratorAgent = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => Input.parse(d))
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
     const prompt = [
       data.characterBible ?? SHERU_CHARACTER_BIBLE,
       `Scene: ${data.scene}.`,
@@ -87,7 +93,83 @@ export const illustratorAgent = createServerFn({ method: "POST" })
       .filter(Boolean)
       .join(" ");
 
+    /**
+     * REFERENCE-LOCKED PATH (image-to-image).
+     * The gateway rejects `seed`, but it does accept the OpenAI multipart
+     * image-edits endpoint, so the approved character sheet becomes the
+     * visual reference for every page.
+     */
+    if (data.referencePath) {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      // Path is namespaced by user id; refuse anything outside the caller's folder.
+      if (!data.referencePath.startsWith(`${context.userId}/`)) {
+        throw new Error("Character sheet reference does not belong to this account");
+      }
+      const { data: file, error } = await supabaseAdmin.storage
+        .from("book-art")
+        .download(data.referencePath);
+      if (error || !file) throw new Error(`Could not read character sheet: ${error?.message}`);
+      const refBytes = new Uint8Array(await file.arrayBuffer());
+
+      const form = new FormData();
+      form.append("model", "openai/gpt-image-1-mini");
+      form.append(
+        "image",
+        new Blob([refBytes], { type: "image/png" }),
+        "character-sheet.png",
+      );
+      form.append(
+        "prompt",
+        [
+          "Use the character in the supplied reference sheet EXACTLY as drawn - identical species, colours, stripe/marking pattern, ear shape, eye colour, body proportions and art style.",
+          "Do not redesign the character and do not copy the plain reference background.",
+          `Draw that same character in a new full-scene illustration. Scene: ${data.scene}.`,
+          data.characterSheet ? `Character notes: ${data.characterSheet}.` : "",
+          "square 1:1 composition, full square frame, nothing important within 0.5 inch of the edges (0.125 inch bleed safe), kids book illustration, soft colors, Pixar storybook 2D, no text in image",
+        ]
+          .filter(Boolean)
+          .join(" "),
+      );
+      form.append("size", "1024x1024");
+      form.append("quality", "high");
+      form.append("n", "1");
+
+      const res = await fetch("https://ai.gateway.lovable.dev/v1/images/edits", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${apiKey()}` },
+        body: form,
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        const msg = body?.message ?? body?.error?.message ?? "Illustration request failed";
+        if (res.status === 402) throw new Error(`${msg} (AI credits needed)`);
+        if (res.status === 429) throw new Error("AI is rate limited right now. Try again shortly.");
+        throw new Error(msg);
+      }
+      const json = await res.json();
+      const b64 = json.data?.[0]?.b64_json;
+      if (!b64) throw new Error("No image returned");
+      const { width, height } = imageSize(b64ToBytes(b64));
+      if (width !== height) {
+        throw new Error(
+          `Illustrator returned a non-square image (${width}x${height}); every page must be 1:1.`,
+        );
+      }
+      console.info(`[illustrator] reference-locked ${width}x${height} ref=${data.referencePath}`);
+      return {
+        image: `data:image/png;base64,${b64}`,
+        aspect: "1:1" as const,
+        sourcePx: Math.min(width, height),
+        width,
+        height,
+        seedApplied: false,
+        seedError: null as string | null,
+        mechanism: "reference-image" as const,
+      };
+    }
+
     const seed = data.bookId ? stableSeed(data.bookId) : undefined;
+
     let seedApplied = false;
     let seedError: string | null = null;
     let lastError = "Illustration request failed";
@@ -157,6 +239,8 @@ export const illustratorAgent = createServerFn({ method: "POST" })
           height,
           seedApplied,
           seedError,
+          mechanism: "prompt-only" as const,
+
         };
       }
       if (!sizeRejected) break;

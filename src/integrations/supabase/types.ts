@@ -18,6 +18,7 @@ export type Database = {
         Row: {
           animal: string
           book_number: number | null
+          character_sheet_image: string | null
           created_at: string
           id: string
           images: Json
@@ -33,6 +34,7 @@ export type Database = {
         Insert: {
           animal: string
           book_number?: number | null
+          character_sheet_image?: string | null
           created_at?: string
           id?: string
           images?: Json
@@ -48,6 +50,7 @@ export type Database = {
         Update: {
           animal?: string
           book_number?: number | null
+          character_sheet_image?: string | null
           created_at?: string
           id?: string
           images?: Json

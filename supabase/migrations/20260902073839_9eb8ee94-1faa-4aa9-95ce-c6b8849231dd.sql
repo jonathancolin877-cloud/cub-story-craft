@@ -1,0 +1,1 @@
+ALTER TABLE public.books ADD COLUMN IF NOT EXISTS character_sheet_image text;
