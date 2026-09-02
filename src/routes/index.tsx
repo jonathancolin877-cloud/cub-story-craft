@@ -120,7 +120,9 @@ function Studio() {
         data: {
           bookId: id,
           characterBible: characterBible(book),
+          characterSheet: book.characterSheet,
           characterName: book.characterName,
+
         },
       });
       setBook({ ...book, characterSheetPath: res.path, characterSheetImage: res.image });
