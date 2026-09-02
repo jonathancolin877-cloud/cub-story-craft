@@ -26,6 +26,8 @@ import {
 import { Progress } from "@/components/ui/progress";
 import { generateBook } from "@/lib/book.functions";
 import { illustratorAgent } from "@/lib/agents/illustrator.functions";
+import { generateCharacterSheet } from "@/lib/agents/character-sheet.functions";
+
 import { characterBible } from "@/lib/book-types";
 import {
   AGES,
@@ -96,9 +98,43 @@ function Studio() {
 
   const book2Blocked = Boolean(book) && !kdpValidated;
 
+  const [sheetBusy, setSheetBusy] = useState(false);
+  const [sheetApproved, setSheetApproved] = useState(false);
+  /** True only when a real reference image is approved and will be sent to the illustrator. */
+  const sheetLocked = Boolean(book?.characterSheetPath) && sheetApproved;
 
   const makeBook = useServerFn(generateBook);
   const makeImage = useServerFn(illustratorAgent);
+  const makeSheet = useServerFn(generateCharacterSheet);
+
+  async function onGenerateSheet() {
+    if (!book) return;
+    setSheetBusy(true);
+    try {
+      let id = bookId;
+      if (!id) {
+        id = await upsertBook(book, null);
+        setBookId(id);
+      }
+      const res = await makeSheet({
+        data: {
+          bookId: id,
+          characterBible: characterBible(book),
+          characterSheet: book.characterSheet,
+          characterName: book.characterName,
+
+        },
+      });
+      setBook({ ...book, characterSheetPath: res.path, characterSheetImage: res.image });
+      setSheetApproved(false);
+      toast.success("Character sheet generated. Approve it to lock page art to it.");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Character sheet failed");
+    } finally {
+      setSheetBusy(false);
+    }
+  }
+
 
   async function onExportPrintPdf() {
     if (!book) {
@@ -218,6 +254,15 @@ function Studio() {
 
   async function onIllustrate() {
     if (!book) return;
+    if (!sheetLocked) {
+      toast.error(
+        book.characterSheetPath
+          ? "Approve the character sheet before generating page art."
+          : "Generate and approve a character sheet first - page art is locked to it.",
+      );
+      return;
+    }
+    const referencePath = book.characterSheetPath;
     const total = book.pages.length + 1;
     setImgProgress({ done: 0, total });
     let current = book;
@@ -233,6 +278,7 @@ function Studio() {
           characterBible: characterBible(book),
           characterSheet: book.characterSheet,
           bookId: id,
+          referencePath,
         },
       });
       current = { ...current, coverImage: cover.image };
@@ -248,6 +294,7 @@ function Studio() {
             characterBible: characterBible(current),
             characterSheet: current.characterSheet,
             bookId: id,
+            referencePath,
           },
         });
         const pages = [...current.pages];
@@ -257,7 +304,8 @@ function Studio() {
         setImgProgress({ done: i + 2, total });
         await saveArtwork(id, res.image, { kind: "page", index: i, page: page.page });
       }
-      toast.success("All 25 illustrations generated and saved!");
+      toast.success("All 25 illustrations generated from the approved reference sheet!");
+
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Illustration failed");
     } finally {
@@ -455,11 +503,65 @@ function Studio() {
               </label>
             </div>
 
+            {/* CHARACTER CONSISTENCY */}
+            <div className="rounded-2xl border border-border bg-background p-3">
+              <p className="text-xs font-bold tracking-wide text-primary uppercase">
+                Character consistency
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Mechanism in use:{" "}
+                <strong className={sheetLocked ? "text-primary" : "text-destructive"}>
+                  {sheetLocked ? "reference image (image-to-image)" : "prompt only"}
+                </strong>
+                .{" "}
+                {sheetLocked
+                  ? "Every page is drawn from the approved character sheet, not from prompt text."
+                  : "Without an approved character sheet the character is held by prompt text only, which drifts across pages."}
+              </p>
+
+              <Button
+                variant="secondary"
+                className="mt-3 w-full rounded-xl font-bold"
+                onClick={onGenerateSheet}
+                disabled={!book || sheetBusy}
+              >
+                {sheetBusy ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Generating sheet...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="mr-2 h-4 w-4" /> Generate character sheet
+                  </>
+                )}
+              </Button>
+
+              {book?.characterSheetImage ? (
+                <>
+                  <img
+                    src={book.characterSheetImage}
+                    alt={`Character turnaround sheet for ${book.characterName || book.animal}`}
+                    className="mt-3 w-full rounded-xl border border-border bg-muted object-contain"
+                  />
+                  <label className="mt-2 flex cursor-pointer items-start gap-2 text-xs font-semibold">
+                    <input
+                      type="checkbox"
+                      className="mt-0.5 cursor-pointer"
+                      checked={sheetApproved}
+                      onChange={(e) => setSheetApproved(e.target.checked)}
+                    />
+                    I approve this sheet as the locked reference for every page
+                  </label>
+                </>
+              ) : null}
+            </div>
+
             <p className="rounded-2xl bg-secondary p-3 text-xs leading-relaxed text-secondary-foreground">
               <strong>Illustration spec (locked):</strong> 1:1 square, upscaled to{" "}
               {PRINT_SPEC.printPx}×{PRINT_SPEC.printPx} for 300 DPI, {PRINT_SPEC.bleedIn}in bleed,{" "}
               {PRINT_SPEC.safeMarginIn}in safe margin. {STYLE_BASE}
             </p>
+
 
 
           </div>
@@ -477,7 +579,7 @@ function Studio() {
                 variant="secondary"
                 className="rounded-xl font-bold"
                 onClick={onIllustrate}
-                disabled={!!imgProgress}
+                disabled={!!imgProgress || !sheetLocked}
               >
                 {imgProgress ? (
                   <>
@@ -486,9 +588,13 @@ function Studio() {
                   </>
                 ) : (
                   <>
-                    <Sparkles className="mr-2 h-4 w-4" /> Generate All Illustrations
+                    <Sparkles className="mr-2 h-4 w-4" />{" "}
+                    {sheetLocked
+                      ? "Generate All Illustrations (from reference sheet)"
+                      : "Character sheet required"}
                   </>
                 )}
+
               </Button>
             ) : null}
           </div>
