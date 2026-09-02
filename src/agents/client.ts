@@ -2,12 +2,15 @@
  * Thin client for the three production agents.
  * illustrator + print/kdp-validator run server-side (edge runtime); the layout
  * agent only prepares 2625px print assets in the browser and calls the server
- * print agent, which emits the real PDF/X-1a file with embedded fonts.
+ * print agent, which emits the real PDF file with embedded fonts.
+ *
+ * Everything below is per EDITION - one language per PDF set.
  */
 import { illustratorAgent } from "@/lib/agents/illustrator.functions";
 import { layoutAgent, type LayoutResult } from "@/lib/agents/layout-agent";
 import { kdpValidatorAgent, type KdpReport } from "@/lib/agents/kdp-validator-agent";
 import type { Book } from "@/lib/book-types";
+import type { BookEdition } from "@/lib/locales";
 
 export const agents = {
   illustrate: (input: {
@@ -16,14 +19,18 @@ export const agents = {
     characterSheet?: string;
     bookId?: string;
   }) => illustratorAgent({ data: input }),
-  layout: (book: Book, onProgress?: (done: number, total: number) => void) =>
-    layoutAgent(book, onProgress),
-  validate: (book: Book, layout?: LayoutResult): Promise<KdpReport> =>
-    kdpValidatorAgent(book, layout),
+  layout: (book: Book, edition: BookEdition, onProgress?: (done: number, total: number) => void) =>
+    layoutAgent(book, edition, onProgress),
+  validate: (book: Book, edition: BookEdition, layout?: LayoutResult): Promise<KdpReport> =>
+    kdpValidatorAgent(book, edition, layout),
   /** Build the KDP PDF only if the server validator passes; otherwise return the report. */
-  async exportIfValid(book: Book, onProgress?: (done: number, total: number) => void) {
-    const layout = await layoutAgent(book, onProgress);
-    const report = await kdpValidatorAgent(book, layout);
+  async exportIfValid(
+    book: Book,
+    edition: BookEdition,
+    onProgress?: (done: number, total: number) => void,
+  ) {
+    const layout = await layoutAgent(book, edition, onProgress);
+    const report = await kdpValidatorAgent(book, edition, layout);
     if (report.blocksPublish) return { exported: false as const, report, layout };
     layout.interior.save();
     layout.cover.save();
