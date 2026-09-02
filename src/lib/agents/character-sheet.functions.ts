@@ -41,13 +41,12 @@ export const generateCharacterSheet = createServerFn({ method: "POST" })
       data.characterBible,
       data.characterSheet ? `Character details (must all be visible): ${data.characterSheet}` : "",
       `Character turnaround model sheet for ${data.characterName || "the character"}:`,
-
       "exactly three full-body poses of the SAME character side by side in one row -",
       "front view on the left, three-quarter view in the middle, side profile on the right.",
       "Plain flat light-grey studio background, no scenery, no props, no text, no labels, no border.",
       "Even neutral lighting, identical proportions, colours and markings in all three poses.",
       "Pixar storybook 2D, soft colors, square 1:1 composition.",
-    ].join(" ");
+    ].filter(Boolean).join(" ");
 
     const res = await fetch("https://ai.gateway.lovable.dev/v1/images/generations", {
       method: "POST",
