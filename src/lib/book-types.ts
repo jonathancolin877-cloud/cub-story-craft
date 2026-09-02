@@ -1,12 +1,33 @@
 export const REGIONS = ["India", "MENA", "Europe", "USA"] as const;
 export type Region = (typeof REGIONS)[number];
 
+/**
+ * The series is global: every animal is selectable in every region.
+ * Region stays a setting (background, culture), never a filter.
+ */
+export const ANIMALS = [
+  "Tiger",
+  "Pangolin",
+  "Elephant",
+  "Peacock",
+  "Oryx",
+  "Falcon",
+  "Gazelle",
+  "Fox",
+  "Bear",
+  "Wolf",
+  "Eagle",
+  "Bison",
+] as const;
+
+/** Kept for compatibility - the same global list for every region. */
 export const ANIMALS_BY_REGION: Record<Region, string[]> = {
-  India: ["Tiger", "Elephant", "Peacock"],
-  MENA: ["Oryx", "Falcon", "Gazelle"],
-  Europe: ["Fox", "Bear", "Wolf"],
-  USA: ["Eagle", "Bison", "Wolf"],
+  India: [...ANIMALS],
+  MENA: [...ANIMALS],
+  Europe: [...ANIMALS],
+  USA: [...ANIMALS],
 };
+
 
 export const LANGUAGE_BY_REGION: Record<Region, { label: string; second: string }> = {
   India: { label: "English + Hindi", second: "Hindi" },
@@ -35,6 +56,8 @@ export const STYLE_BASE =
 export const CHARACTER_BIBLE: Record<string, string> = {
   Tiger:
     "Cute baby tiger cub Sheru, orange with black stripes, white belly, pink nose, small rounded ears, big amber eyes, same proportions every page, Pixar storybook 2D, soft colors, lush Indian jungle background, no text in image",
+  Pangolin:
+    "Cute baby pangolin named Tumbi, warm sandy-gold overlapping scales like small rounded artichoke leaves, soft pale cream belly with no scales, tiny rounded ears, a long tapering scaled tail, small dark shining friendly eyes, a narrow gentle snout, short sturdy legs with curled-under front claws, same proportions every page, Pixar storybook 2D, soft colours, warm African savanna and woodland background, no text in image",
 };
 
 
