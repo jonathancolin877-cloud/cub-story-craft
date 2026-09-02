@@ -951,6 +951,12 @@ function Studio() {
               <p className="font-bold">
                 KDP validator: {kdpReport.pass ? "PASS" : kdpReport.blocksPublish ? "FAIL - publish blocked" : "PASS with warnings"}
               </p>
+              <p className="text-muted-foreground">
+                Edition {localeDef(kdpReport.locale ?? activeLocale).label} ·{" "}
+                {kdpReport.locale ?? activeLocale} ·{" "}
+                {(kdpReport.direction ?? "ltr") === "rtl" ? "right-to-left" : "left-to-right"}
+              </p>
+
               {kdpReport.checks.map((c) => (
                 <div
                   key={c.id}
