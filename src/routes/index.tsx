@@ -59,11 +59,11 @@ import { supabase } from "@/integrations/supabase/client";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Little Zoologists - bilingual kids book studio" },
+      { title: "Little Zoologists - kids picture book studio" },
       {
         name: "description",
         content:
-          "Generate a 24-page bilingual kids picture book, KDP-ready PDF, YouTube script and Instagram reels from one animal and region.",
+          "Generate a 24-page kids picture book, KDP-ready PDF, YouTube script and Instagram reels from one animal and region.",
       },
       { property: "og:title", content: "Little Zoologists" },
       {
@@ -445,7 +445,7 @@ function Studio() {
             </span>
             <div>
               <h1 className="text-2xl leading-tight font-extrabold">Little Zoologists</h1>
-              <p className="text-sm opacity-90">Bilingual picture books with real animal facts</p>
+              <p className="text-sm opacity-90">Picture books with real animal facts, in your language</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -807,7 +807,7 @@ function Studio() {
               <div className="text-6xl">🌿</div>
               <p className="mt-3 max-w-sm text-sm text-muted-foreground">
                 Pick a region, animal and value, then press{" "}
-                <strong>Generate Book Package</strong>. Your 24-page bilingual story appears here.
+                <strong>Generate Book Package</strong>. Your 24-page story appears here.
               </p>
             </div>
           ) : (

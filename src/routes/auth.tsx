@@ -14,7 +14,7 @@ export const Route = createFileRoute("/auth")({
       {
         name: "description",
         content:
-          "Sign in to the Little Zoologists studio to create and manage your own bilingual kids books securely.",
+          "Sign in to the Little Zoologists studio to create and manage your own kids picture books securely.",
       },
       { property: "og:title", content: "Sign in - Little Zoologists" },
       {
