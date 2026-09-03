@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { BOOK_STORAGE_KEY, type Book } from "@/lib/book-types";
+import { amazonSearchUrl, BOOK_STORAGE_KEY, type Book } from "@/lib/book-types";
 
 export const Route = createFileRoute("/landing")({
   head: () => ({
@@ -9,12 +9,12 @@ export const Route = createFileRoute("/landing")({
       {
         name: "description",
         content:
-          "Bilingual English + Hindi picture book for ages 3-5, with real animal facts. Buy now on Amazon.in.",
+          "Picture book for ages 3-5 with real animal facts, in your language. Buy now on Amazon.",
       },
       { property: "og:title", content: "Little Zoologists picture book" },
       {
         property: "og:description",
-        content: "Bilingual kids picture book with real zoology facts. Available on Amazon.in.",
+        content: "Kids picture book with real zoology facts, in your language. Available on Amazon.",
       },
       { property: "og:type", content: "book" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -36,7 +36,7 @@ function Landing() {
   }, []);
 
   const title = book?.title ?? "Little Zoologists";
-  const amazon = `https://www.amazon.in/s?k=${encodeURIComponent(title)}`;
+  const amazon = amazonSearchUrl(title, book?.marketplace);
 
   return (
     <main className="min-h-screen bg-background">
@@ -57,7 +57,7 @@ function Landing() {
             {book ? <p className="mt-1 text-2xl font-bold">{book.titleTranslated}</p> : null}
             <p className="mt-4 text-base opacity-95">
               {book?.blurb ??
-                "A warm bilingual picture book with real animal facts on every page."}
+                "A warm picture book with real animal facts on every page."}
             </p>
             <ul className="mt-4 space-y-1 text-sm opacity-95">
               <li>✅ 24 pages · English + {book?.secondLanguage ?? "Hindi"}</li>
@@ -71,7 +71,7 @@ function Landing() {
                 rel="noopener noreferrer"
                 className="rounded-full bg-sunshine px-6 py-3 text-base font-extrabold text-accent-foreground"
               >
-                Buy on Amazon.in
+                Buy on Amazon
               </a>
               <a
                 href={amazon}

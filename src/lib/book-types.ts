@@ -106,7 +106,32 @@ export type Book = {
   affirmationEn?: string;
   affirmationTranslated?: string;
   pages: BookPage[];
+  /** Amazon marketplace host this edition is sold on. Defaults to amazon.com. */
+  marketplace?: string;
 };
+
+/** KDP prints and ships in these marketplaces; amazon.in is not one of them. */
+export const AMAZON_MARKETPLACES = [
+  "www.amazon.com",
+  "www.amazon.co.uk",
+  "www.amazon.ca",
+  "www.amazon.com.au",
+  "www.amazon.de",
+  "www.amazon.fr",
+  "www.amazon.es",
+  "www.amazon.it",
+  "www.amazon.nl",
+  "www.amazon.pl",
+  "www.amazon.se",
+  "www.amazon.co.jp",
+] as const;
+
+export const DEFAULT_MARKETPLACE = "www.amazon.com";
+
+export function amazonSearchUrl(title: string, marketplace?: string) {
+  const host = marketplace?.trim() || DEFAULT_MARKETPLACE;
+  return `https://${host}/s?k=${encodeURIComponent(title)}`;
+}
 
 export const BOOK_STORAGE_KEY = "mawil-current-book";
 /** Book 1 must pass the KDP validator before Book 2 may be generated. */

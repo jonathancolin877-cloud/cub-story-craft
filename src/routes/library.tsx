@@ -17,7 +17,7 @@ export const Route = createFileRoute("/library")({
       { property: "og:title", content: "Book Library - Little Zoologists" },
       {
         property: "og:description",
-        content: "Browse all bilingual kids books, sorted with live titles first.",
+        content: "Browse all Little Zoologists books, sorted with live titles first.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
