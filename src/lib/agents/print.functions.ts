@@ -824,7 +824,18 @@ export const buildWraparoundCover = createServerFn({ method: "POST" })
       PDFName.of("TrimBox"),
       doc.context.obj([BLEED_PT, BLEED_PT, WRAP_W_PT - BLEED_PT, WRAP_H_PT - BLEED_PT]),
     );
-    page.drawRectangle({ x: 0, y: 0, width: WRAP_W_PT, height: WRAP_H_PT, color: rgb(1, 1, 1) });
+    // Full-bleed warm jungle-green field across back, spine and front so the
+    // wrap reads as one designed object (and as a solid Amazon thumbnail).
+    const COVER_BG: Rgb = [0.055, 0.204, 0.133];
+    const CREAM: Rgb = [0.977, 0.953, 0.886];
+    const GOLD: Rgb = [0.925, 0.769, 0.353];
+    page.drawRectangle({
+      x: 0,
+      y: 0,
+      width: WRAP_W_PT,
+      height: WRAP_H_PT,
+      color: rgb(COVER_BG[0], COVER_BG[1], COVER_BG[2]),
+    });
 
     const em = (f: Face, size: number) => size / f.shaper.unitsPerEm;
     const measure = (f: Face, text: string, size: number, direction: Direction = dir) =>
