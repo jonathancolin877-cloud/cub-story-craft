@@ -929,69 +929,86 @@ export const buildWraparoundCover = createServerFn({ method: "POST" })
     const backCx = (backSafeX0 + backSafeX1) / 2;
     const safeBottom = BLEED_PT + SAFE_IN_PT; // 45
     const safeTop = WRAP_H_PT - BLEED_PT - SAFE_IN_PT; // 585
-    // Barcode reserve (bottom-right of back cover) — intentionally left blank.
+    // Barcode reserve (bottom-right of back cover): clean white, nothing drawn in it.
     const barcodeX0 = backSafeX1 - BARCODE_W;
 
-    let by = safeTop - 150;
     if (data.blurb.trim()) {
-      by = centre(body, wrapText(body, data.blurb, 17, backSafeW), 17, backCx, by, INK, 1.45);
+      const blurbSize = 16;
+      const blurbLead = 1.7;
+      const lines = wrapText(body, data.blurb, blurbSize, backSafeW);
+      const blockH = lines.length * blurbSize * blurbLead;
+      const zoneBottom = WRAP_H_PT / 3;
+      const top = (safeTop + zoneBottom) / 2 + blockH / 2;
+      centre(body, lines, blurbSize, backCx, Math.min(top, safeTop - blurbSize), CREAM, blurbLead);
     }
     if (data.affirmation.trim()) {
-      by -= 40;
       centre(
         bodyBold,
-        wrapText(bodyBold, data.affirmation, 21, backSafeW),
-        21,
+        wrapText(bodyBold, data.affirmation, 19, backSafeW),
+        19,
         backCx,
-        by,
-        AMBER,
+        WRAP_H_PT / 3 - 24,
+        GOLD,
         1.45,
       );
     }
-    // Series line: centred in the area LEFT of the blank barcode reserve.
     // Imprint / copyright line - legal publisher only, never on the front cover.
     centre(
       latin,
-      [`(c) ${new Date().getFullYear()} ${data.author}. Published by ${data.publisher}.`],
-      8,
+      [
+        `(c) ${new Date().getFullYear()} ${data.author}. Published by ${data.publisher}. ${data.seriesLine}`,
+      ],
+      9,
       (backSafeX0 + barcodeX0) / 2,
-      safeBottom + 14,
-      INK,
+      safeBottom + 4,
+      CREAM,
       1.4,
       "ltr",
     );
-    centre(latin, [data.seriesLine], 9, (backSafeX0 + barcodeX0) / 2, safeBottom + 2, INK, 1.4, "ltr");
+    // Clean white barcode zone, drawn last so nothing sits under it.
+    page.drawRectangle({
+      x: barcodeX0,
+      y: safeBottom,
+      width: BARCODE_W,
+      height: BARCODE_H,
+      color: rgb(1, 1, 1),
+    });
 
-    // ---------------- SPINE (blank white, no text) ----------------
+    // ---------------- SPINE (plain, no text) ----------------
 
     // ---------------- FRONT COVER ----------------
     const frontCx = (SPINE_X1 + FRONT_X1) / 2;
     const nativePx = data.coverNativePx && data.coverNativePx > 0 ? data.coverNativePx : 1024;
-    const panelPt = Math.min((nativePx / 300) * PT, TRIM_IN * PT - SAFE_IN_PT * 2);
+    // Size beats sharpness on a cover: draw the art large (6.5in) and accept
+    // the upscale, exactly as the interior pages do.
+    const panelPt = 6.5 * PT;
     const panelX = frontCx - panelPt / 2;
-    const panelY = (WRAP_H_PT - panelPt) / 2 - 10;
-    page.drawRectangle({
-      x: panelX - 6,
-      y: panelY - 6,
-      width: panelPt + 12,
-      height: panelPt + 12,
-      color: rgb(0.988, 0.965, 0.906),
-      borderColor: rgb(0.85, 0.76, 0.53),
-      borderWidth: 1.2,
-    });
+    const panelY = 80;
     const dl = await bucket.download(data.coverPath);
     if (dl.error || !dl.data) throw new Error("Cover art not found in storage");
     const artBytes = new Uint8Array(await dl.data.arrayBuffer());
     const artPx = jpegSize(artBytes);
     const art = await doc.embedJpg(artBytes);
     page.drawImage(art, { x: panelX, y: panelY, width: panelPt, height: panelPt });
+    page.drawRectangle({
+      x: panelX,
+      y: panelY,
+      width: panelPt,
+      height: panelPt,
+      borderColor: rgb(GOLD[0], GOLD[1], GOLD[2]),
+      borderWidth: 1.5,
+    });
 
     const frontSafeW = TRIM_IN * PT - SAFE_IN_PT * 2;
-    const titleLines = wrapText(display, data.title, 32, frontSafeW);
-    const titleTop = panelY + panelPt + 32 + (titleLines.length - 1) * 32 * 1.35;
-    centre(display, titleLines, 32, frontCx, titleTop, INK, 1.35);
-    centre(latin, [data.author], 14, frontCx, panelY - 26, INK, 1.4, "ltr");
-    centre(latin, [data.seriesLine], 10, frontCx, safeBottom + 6, INK, 1.4, "ltr");
+    let titleSize = 38;
+    let titleLines = wrapText(display, data.title, titleSize, frontSafeW);
+    while (titleLines.length > 1 && titleSize > 24) {
+      titleSize -= 2;
+      titleLines = wrapText(display, data.title, titleSize, frontSafeW);
+    }
+    centre(display, titleLines, titleSize, frontCx, 585 - titleSize * 0.72, CREAM, 1.2);
+    centre(latin, [data.author], 15, frontCx, safeBottom + 15, CREAM, 1.4, "ltr");
+    centre(latin, [data.seriesLine], 10, frontCx, safeBottom, GOLD, 1.4, "ltr");
 
     doc.setTitle(`${data.title} - KDP wraparound cover (${data.locale})`);
     doc.setAuthor(data.author);
