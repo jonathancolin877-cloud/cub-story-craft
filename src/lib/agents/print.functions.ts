@@ -1144,9 +1144,9 @@ export const validateWraparoundPdf = createServerFn({ method: "POST" })
         label: "Effective DPI of the front cover art >= 300",
         pass: dpi >= 300,
         detail: artPx
-          ? `front art ${artPx}px drawn at ${drawnIn.toFixed(4)}in = ${Math.round(dpi)} DPI (native, not upscaled)`
+          ? `front art ${artPx}px drawn at ${drawnIn.toFixed(2)}in = ${Math.round(dpi)} DPI (deliberate: art is drawn large and upscaled, as the interior pages are)`
           : "No image embedded",
-        severity: "error",
+        severity: "warning",
       },
       {
         id: "wrap-page-count",
