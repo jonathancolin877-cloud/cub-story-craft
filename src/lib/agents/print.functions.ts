@@ -979,6 +979,7 @@ export const buildWraparoundCover = createServerFn({ method: "POST" })
     const titleLines = wrapText(display, data.title, 32, frontSafeW);
     const titleTop = panelY + panelPt + 32 + (titleLines.length - 1) * 32 * 1.35;
     centre(display, titleLines, 32, frontCx, titleTop, INK, 1.35);
+    centre(latin, [data.author], 14, frontCx, panelY - 26, INK, 1.4, "ltr");
     centre(latin, [data.seriesLine], 10, frontCx, safeBottom + 6, INK, 1.4, "ltr");
 
     doc.setTitle(`${data.title} - KDP wraparound cover (${data.locale})`);
