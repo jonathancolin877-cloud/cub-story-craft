@@ -941,7 +941,7 @@ function Studio() {
               <ExportButton
                 icon={<Globe2 className="h-4 w-4" />}
                 title="Landing Page Link"
-                sub="Cover + Amazon.in buy buttons"
+                sub="Cover + Amazon buy buttons"
               />
             </Link>
           </div>
