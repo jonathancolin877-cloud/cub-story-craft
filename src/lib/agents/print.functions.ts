@@ -1085,7 +1085,8 @@ export const validateWraparoundPdf = createServerFn({ method: "POST" })
       Number(m[1]),
     );
     const artPx = widths.length ? Math.min(...widths) : 0;
-    const drawnIn = Math.min((data.coverNativePx || artPx || 1024) / 300, TRIM_IN - MARGIN_IN * 2);
+    // Cover art is drawn at a fixed 6.5in square (size beats sharpness on a cover).
+    const drawnIn = 6.5;
     const dpi = artPx && drawnIn ? artPx / drawnIn : 0;
     const fontFiles = (raw.match(/\/FontFile2/g) ?? []).length;
     const rtl = data.direction === "rtl";
